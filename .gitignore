@@ -1,0 +1,6 @@
+out/
+node_modules/
+*.cpuprofile
+*.log
+transcripts*.tar.gz
+.env

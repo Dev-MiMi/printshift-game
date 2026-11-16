@@ -1,0 +1,9 @@
+{
+  "name": "printshift-game",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "An original offline printing-workshop game.",
+  "scripts": { "start": "node serve.mjs", "check": "node tools/check.mjs" },
+  "license": "MIT"
+}

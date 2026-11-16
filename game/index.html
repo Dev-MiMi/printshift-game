@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#162849">
+  <title>PRINTSHIFT — The little press with big orders</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main id="app" aria-label="Printshift printing workshop">
+    <canvas id="game" width="1200" height="760" aria-label="Three printing conveyor lanes. Select a lane with 1, 2, or 3; toggle its cyan, magenta, and yellow rollers with C, M, and Y. S changes its stamp. Space slows the press."></canvas>
+    <header id="hud"></header>
+    <section id="overlay" aria-label="Game menu"></section>
+    <aside id="toast" role="status" aria-live="polite"></aside>
+    <footer id="controls"></footer>
+    <p id="status" class="sr-only" role="status" aria-live="polite"></p>
+  </main>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
