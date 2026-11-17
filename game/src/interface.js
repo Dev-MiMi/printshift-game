@@ -1,4 +1,5 @@
 import { UPGRADES, SHIFTS } from './levels.js';
+import { EDITIONS, posterMarkup } from './posters.js';
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const number = value => Math.max(0, Math.round(Number(value) || 0)).toLocaleString('en-US');
@@ -13,8 +14,34 @@ function heading(kicker, title, subtitle = '') {
   return `<p class="eyebrow">${escapeHtml(kicker)}</p><h1>${escapeHtml(title)}</h1>${subtitle ? `<p class="panel-intro">${escapeHtml(subtitle)}</p>` : ''}`;
 }
 
-function recipePoster() {
-  return `<div class="recipe-posters" aria-hidden="true"><div class="mini-poster poster-cyan"><span>01</span><b>●</b><small>CYAN / C</small></div><div class="mini-poster poster-violet"><span>02</span><b>◆</b><small>VIOLET / C + M</small></div><div class="mini-poster poster-coral"><span>03</span><b>★</b><small>CORAL / M + Y</small></div></div>`;
+function editionPoster(specimen, { grade = '', className = 'edition-poster' } = {}) {
+  const index = Math.max(0, Math.min(EDITIONS.length - 1, specimen.edition || 0));
+  const edition = EDITIONS[index];
+  return `<figure class="${className}"><div class="poster-art">${posterMarkup({ ...specimen, edition: index })}</div><figcaption><span class="poster-number">${String(index + 1).padStart(2, '0')}</span><b>${escapeHtml(edition.name)}</b>${grade ? `<small>${escapeHtml(grade)}</small>` : ''}</figcaption></figure>`;
+}
+
+function previewPosters() {
+  return `<div class="recipe-posters" aria-label="Three original editions you can print">${[{ edition: 0, mask: 1, stamp: 'circle' }, { edition: 2, mask: 6, stamp: 'diamond' }, { edition: 4, mask: 7, stamp: 'star' }].map(specimen => editionPoster(specimen)).join('')}</div>`;
+}
+
+function scoreBreakdown(state, final = false) {
+  const results = final ? state.history || [] : [state.history?.at(-1)].filter(Boolean);
+  const timeBonus = results.reduce((sum, result) => sum + (result.timeBonus || 0), 0);
+  const qualityBonus = results.reduce((sum, result) => sum + (result.qualityBonus || 0), 0);
+  const score = final ? state.stats?.campaignScore : state.stats?.score;
+  return `<div class="score-breakdown" aria-label="Score breakdown"><span><small>PRINTS + COMBOS</small><b>${number((score || 0) - timeBonus - qualityBonus)}</b></span><span><small>TIME BONUS</small><b>+${number(timeBonus)}</b></span><span><small>PROOF BONUS</small><b>+${number(qualityBonus)}</b></span></div>`;
+}
+
+function upgradeCards(state) {
+  const benefits = {
+    quality: { label: 'PROOF PAPER', benefit: '+1 proof point', detail: 'An extra safety point in every remaining shift.', icon: '✓' },
+    brake: { label: 'PRECISION BRAKE', benefit: '+0.4s braking', detail: 'Brake again 1.5 seconds sooner.', icon: 'Ⅱ' },
+    combo: { label: 'SIGNATURE FINISH', benefit: '+20% combo bonus', detail: 'Earn more from consecutive good prints.', icon: '✳' },
+  };
+  return `<div class="upgrade-heading"><b>Choose your next advantage.</b><span>Pick one free upgrade · lasts for all remaining shifts</span></div><div class="upgrade-grid">${UPGRADES.map(item => {
+    const benefit = benefits[item.id];
+    return `<button class="upgrade-card upgrade-${item.id}" data-action="upgrade" data-choice="${item.id}"><span class="upgrade-label"><i aria-hidden="true">${benefit.icon}</i>${benefit.label}</span><b class="upgrade-benefit">${benefit.benefit}</b><span class="upgrade-detail">${benefit.detail}</span><span class="upgrade-select">Choose upgrade <span aria-hidden="true">↗</span></span></button>`;
+  }).join('')}</div>`;
 }
 
 function lessons(state) {
@@ -86,7 +113,7 @@ export function createInterface({ onAction = () => {}, onPreference = () => {} }
     const stats = state.stats || {};
     const level = state.level || SHIFTS[0];
     if (stage === 'title') {
-      return `<section class="panel title-panel"><div class="edition-line"><span>AN ORIGINAL PRINTING WORKSHOP</span><span>VOL. 01 / EST. TODAY</span></div><h1 class="brand-title">PRINT<span>SHIFT</span><i aria-hidden="true">✳</i></h1><p class="title-tagline">Make good impressions.</p><p class="panel-intro title-intro">A little ink. A little timing. A whole workshop to master.<br>Mix colors, route paper, and print your five-shift signature collection.</p>${recipePoster()}<div class="panel-actions">${button('Open the workshop <span aria-hidden="true">↗</span>', 'start', { attributes: 'data-mode="campaign"' })}${button('Learn the rhythm', 'start', { secondary: true, attributes: 'data-mode="practice"' })}</div><div class="title-foot"><p>Mouse + keyboard <span>·</span> Five shifts <span>·</span> Play offline</p>${preferencesMarkup()}</div></section>`;
+      return `<section class="panel title-panel"><div class="edition-line"><span>AN ORIGINAL PRINTING WORKSHOP</span><span>FIVE EDITIONS / ONE COLLECTION</span></div><h1 class="brand-title">PRINT<span>SHIFT</span><i aria-hidden="true">✳</i></h1><p class="title-tagline">Match every order. Master all five shifts.</p><p class="panel-intro title-intro">Mix inks, route paper, and match the final stamp.<br>Finish before the courier leaves; keep your proof paper intact.</p>${previewPosters()}<div class="panel-actions">${button('Start five-shift campaign <span aria-hidden="true">↗</span>', 'start', { attributes: 'data-mode="campaign"' })}${button('Practice the press', 'start', { secondary: true, attributes: 'data-mode="practice"' })}</div><div class="title-foot"><p>Mouse + keyboard <span>·</span> Play offline</p>${preferencesMarkup()}</div></section>`;
     }
     if (stage === 'brief') {
       return `<section class="panel brief-panel">${heading(state.mode === 'practice' ? 'THE APPRENTICE DESK' : level.subtitle, level.title, level.brief)}<div class="brief-target"><span class="target-seal" aria-hidden="true">✓</span><div><small>YOUR ORDER BOOK</small><strong>Ship ${stats.quota || level.quota} good prints</strong><p>${state.mode === 'practice' ? 'A gentler pace to learn the press.' : `${Math.ceil(level.duration)} seconds · ${stats.qualityMax || level.qualityMax} proof-paper points`}</p></div></div>${lessons(state)}<p class="tip-line"><b>Press tip</b> ${escapeHtml(level.hint)}</p><div class="panel-actions">${button('Start printing <span aria-hidden="true">→</span>', 'begin')}${button('Back to workshop', 'title', { secondary: true })}</div>${preferencesMarkup()}</section>`;
@@ -97,12 +124,13 @@ export function createInterface({ onAction = () => {}, onPreference = () => {} }
     if (stage === 'shift-complete') {
       const result = state.history?.[state.history.length - 1];
       const upgrade = UPGRADES.find(item => item.id === state.upgradeChosen);
-      const upgradeSection = state.upgradeAvailable ? `<div class="upgrade-heading"><b>Make the workshop yours.</b><span>Choose one improvement for the remaining shifts.</span></div><div class="upgrade-grid">${UPGRADES.map(item => `<button class="upgrade-card" data-action="upgrade" data-choice="${item.id}"><small>${item.id === 'quality' ? '✓' : item.id === 'brake' ? 'Ⅱ' : '✳'}</small><b>${escapeHtml(item.title)}</b><span>${escapeHtml(item.description)}</span></button>`).join('')}</div>` : `<p class="upgrade-picked">${upgrade ? `Workshop improved: <b>${escapeHtml(upgrade.title)}</b>` : 'The next order book is ready.'}</p>`;
-      return `<section class="panel result-panel"><div class="result-stamp">${escapeHtml(result?.grade || 'DELIVERED')}</div>${heading(`SHIFT ${String(state.shiftIndex + 1).padStart(2, '0')} / 05 COMPLETE`, 'Fresh off the press.', 'The neighborhood order is packed and ready.')} ${resultMetrics(state)}${upgradeSection}<div class="panel-actions">${button('Next shift <span aria-hidden="true">→</span>', 'next')}${button('Retry for a cleaner run', 'retry', { secondary: true })}</div></section>`;
+      const edition = EDITIONS[state.shiftIndex] || EDITIONS[0];
+      const upgradeSection = state.upgradeAvailable ? upgradeCards(state) : `<p class="upgrade-picked">${upgrade ? `Upgrade installed: <b>${escapeHtml(upgrade.title)}</b>` : 'The next order book is ready.'}<span>${SHIFTS.length - state.shiftIndex - 1} shifts left to complete your collection.</span></p>`;
+      return `<section class="panel result-panel"><div class="shift-result-heading">${editionPoster(result?.specimen || { edition: state.shiftIndex, mask: 0 }, { className: 'result-specimen' })}<div><div class="result-stamp">${escapeHtml(result?.grade || 'DELIVERED')}</div>${heading(`SHIFT ${String(state.shiftIndex + 1).padStart(2, '0')} / 05 DELIVERED`, 'Fresh off the press.', `${edition.name} is ready for the courier.`)}</div></div>${resultMetrics(state)}${scoreBreakdown(state)}${upgradeSection}<div class="panel-actions">${button('Next shift <span aria-hidden="true">→</span>', 'next')}${button('Retry for a cleaner run', 'retry', { secondary: true })}</div></section>`;
     }
     if (stage === 'victory') {
       const practice = state.mode === 'practice';
-      return `<section class="panel victory-panel"><div class="result-stamp">${practice ? 'APPRENTICE APPROVED' : 'SIGNATURE EDITION'}</div>${heading(practice ? 'THE RHYTHM IS YOURS' : 'ALL FIVE SHIFTS DELIVERED', practice ? 'You’ve got the knack.' : 'Made by your hands.', practice ? 'Good prints are all about reading ahead and preparing a lane.' : 'Five order books. Three inks. One beautiful collection.')} ${resultMetrics(state, true)}${practice ? recipePoster() : `<div class="collection-row">${(state.history || []).map((item, index) => `<div class="collection-card collection-${index}"><small>NO. ${String(index + 1).padStart(2, '0')}</small><b>${['●', '◆', '▲', '✳', '★'][index]}</b><span>${escapeHtml(item.grade)}</span></div>`).join('')}</div>`}<div class="panel-actions">${practice ? button('Open the five-shift workshop', 'start', { attributes: 'data-mode="campaign"' }) : button('Print another collection', 'restart')}${button('Back to title', 'title', { secondary: true })}</div><p class="result-note">${practice ? 'Ready when you are. Your first real shift starts gently.' : 'Try a cleaner run, chase longer combos, or build a different workshop.'}</p></section>`;
+      return `<section class="panel victory-panel"><div class="result-stamp">${practice ? 'APPRENTICE APPROVED' : 'COLLECTION COMPLETE'}</div>${heading(practice ? 'THE RHYTHM IS YOURS' : 'ALL FIVE SHIFTS DELIVERED', practice ? 'You’ve got the knack.' : 'Made by your hands.', practice ? 'Match the inks. Prepare the lane. Ship good prints.' : 'Five original editions, printed and delivered.')} ${resultMetrics(state, true)}${scoreBreakdown(state, true)}${practice ? previewPosters() : `<div class="collection-row" aria-label="Your five printed editions">${(state.history || []).map((item, index) => editionPoster(item.specimen || { edition: index, mask: 0 }, { grade: item.grade, className: 'collection-card' })).join('')}</div>`}<div class="panel-actions">${practice ? button('Start five-shift campaign', 'start', { attributes: 'data-mode="campaign"' }) : button('Print another collection', 'restart')}${button('Back to title', 'title', { secondary: true })}</div><p class="result-note">${practice ? 'Ready for all five shifts? Your first real order starts gently.' : 'Replay for a cleaner collection, longer combos, and different upgrades.'}</p></section>`;
     }
     return `<section class="panel failure-panel"><div class="result-stamp stamp-coral">REPRINT REQUESTED</div>${heading('EVERY MAKER LEARNS', 'Back to the proof desk.', state.failureReason || state.notice || 'This order book needs another try.')} ${resultMetrics(state)}<div class="failure-tip"><b>Make your next run count.</b><p>Read two orders ahead. A roller changes every sheet passing it, so prepare a lane before routing paper. Use the brake to regain your rhythm.</p></div><div class="panel-actions">${button('Retry this shift', 'retry')}${button('Back to title', 'title', { secondary: true })}</div><p class="result-note">Your earlier completed shifts stay in the collection.</p></section>`;
   }

@@ -1,9 +1,17 @@
 import { INKS, INK_STATIONS, RECIPE_COLORS, STAMP_X, recipeName, recipeSymbols } from './recipes.js';
+import { EDITIONS, drawPoster } from './posters.js';
 
 export const BOARD = Object.freeze({ left: 130, right: 1050, width: 920, lanes: [265, 400, 535] });
 const COLORS = { navy: '#172b4d', cream: '#fbf4dc', paper: '#fffbec', steel: '#c8d1cb', red: '#ef7259', teal: '#247f87' };
 const inkX = index => BOARD.left + BOARD.width * INK_STATIONS[index];
 const stampX = BOARD.left + BOARD.width * STAMP_X;
+const ATMOSPHERES = Object.freeze({
+  morning: { background: '#fbf4dc', frame: '#e5e7d2', lane: '#e9e8d5', selected: '#d5e6d7', accent: '#247f87' },
+  noon: { background: '#fff2da', frame: '#e9dfcd', lane: '#f1e6ce', selected: '#e8e1ec', accent: '#8065a3' },
+  afternoon: { background: '#f0f4df', frame: '#dde6d4', lane: '#e8eddc', selected: '#cee3d8', accent: '#427f70' },
+  evening: { background: '#f8e9dc', frame: '#e7d6cf', lane: '#ecded6', selected: '#e9d4c5', accent: '#a76552' },
+  night: { background: '#e6e9e9', frame: '#d1dde0', lane: '#e2e8e8', selected: '#c9dfdf', accent: '#435c81' },
+});
 
 export function hitTest(x, y, state) {
   if (!['play', 'brief'].includes(state.stage)) return null;
@@ -28,7 +36,9 @@ export function createRenderer(canvas) {
   const paperTexture = ctx.createPattern(texture, 'repeat');
   const effects = [];
   const prints = [];
+  const posterCache = new Map();
   let clock = 0;
+  let currentEdition = 0;
   function rounded(x, y, width, height, radius = 8) {
     ctx.beginPath(); ctx.roundRect(x, y, width, height, radius);
   }
@@ -63,45 +73,93 @@ export function createRenderer(canvas) {
     glyph(stamp || 'circle', 0, 0, radius * .35, mask ? COLORS.paper : '#d2d1bd');
     ctx.restore();
   }
-  function paperCard(x, y, mask, target, stamp, targetStamp, selected, identifier, needsStamp) {
+  function poster(edition, mask, stamp, x, y, width, height) {
+    const key = [edition, mask, stamp || '', width, height].join('|');
+    if (!posterCache.has(key)) {
+      const image = document.createElement('canvas');
+      image.width = Math.ceil(width * 2); image.height = Math.ceil(height * 2);
+      drawPoster(image.getContext('2d'), { edition, mask, stamp, width: image.width, height: image.height });
+      posterCache.set(key, image);
+      if (posterCache.size > 180) posterCache.delete(posterCache.keys().next().value);
+    }
+    ctx.drawImage(posterCache.get(key), x, y, width, height);
+  }
+  function paperStatus(sheet, needsStamp) {
+    const wrong = (sheet.inkMask & ~sheet.targetMask) || (sheet.targetMask & sheet.processedMask & ~sheet.inkMask);
+    if (wrong) return { text: 'REPRINT', color: '#b75543', bad: true };
+    if (sheet.inkMask !== sheet.targetMask) return { text: 'LAYERING', color: '#7b877d' };
+    if (needsStamp && !sheet.stamped) return { text: 'STAMP NEXT', color: '#a67c34' };
+    if (needsStamp && sheet.stamp !== sheet.targetStamp) return { text: 'WRONG STAMP', color: '#b75543', bad: true };
+    return { text: 'READY', color: '#247f87' };
+  }
+  function paperCard(x, y, sheet, selected, needsStamp, edition) {
+    const status = paperStatus(sheet, needsStamp);
+    const left = Math.max(117, x - 45), top = y - 41;
+    const cardCenter = left + 45;
     ctx.save();
-    box(x - 35, y - 34 + 4, 70, 77, 'rgba(23,43,77,.14)', null, 3);
-    box(x - 35, y - 34, 70, 77, COLORS.paper, selected ? COLORS.teal : '#bdc4b6', 3);
-    label('ORDER ' + String(identifier).padStart(2, '0'), x, y - 22, 7, '#556375', 'monospace', 'center');
-    rosette(x, y + 1, 19, mask, stamp);
-    label(recipeSymbols(target), x, y + 30, 10, COLORS.navy, 'monospace', 'center');
+    box(left + 2, top + 4, 90, 86, 'rgba(23,43,77,.17)', null, 3);
+    box(left, top, 90, 86, COLORS.paper, status.bad ? status.color : selected ? COLORS.teal : '#adb7a7', 3);
+    box(left + 4, top + 4, 82, 11, status.bad ? '#f0d6c9' : '#ecead9', null, 1);
+    label('NO.' + String(sheet.id).padStart(2, '0'), left + 8, top + 10, 8, '#52646b');
+    label(recipeSymbols(sheet.targetMask), left + 82, top + 10, 8.5, COLORS.navy, 'monospace', 'right');
+    poster(edition, sheet.inkMask, sheet.stamped ? sheet.stamp : null, left + 5, top + 18, 45, 50);
+    label('NEEDS', left + 56, top + 23, 6.5, '#7b8479');
     INKS.forEach((ink, index) => {
-      const xx = x - 15 + index * 15;
-      if (target & ink.bit) { ctx.beginPath(); ctx.arc(xx, y - 9, 3, 0, Math.PI * 2); ctx.fillStyle = ink.color; ctx.fill(); }
+      const yy = top + 33 + index * 11;
+      const required = Boolean(sheet.targetMask & ink.bit), printed = Boolean(sheet.inkMask & ink.bit);
+      ctx.beginPath(); ctx.arc(left + 60, yy, 3, 0, Math.PI * 2);
+      ctx.fillStyle = printed ? ink.color : '#e0dfce'; ctx.fill();
+      ctx.strokeStyle = required ? '#566b6a' : '#c8cbbb'; ctx.lineWidth = required ? 1.2 : .6; ctx.stroke();
+      label(ink.short, left + 69, yy, 8, required ? COLORS.navy : '#b0b4a6');
+      if (printed && !required) label('×', left + 81, yy, 9, '#b75543');
     });
-    if (needsStamp) glyph(targetStamp, x + 23, y + 1, 6, COLORS.navy, true);
+    if (needsStamp) {
+      glyph(sheet.targetStamp, left + 62, top + 66, 4, '#536976', true);
+      label(sheet.stamped && sheet.stamp === sheet.targetStamp ? '✓' : '→', left + 76, top + 66, 9, sheet.stamped && sheet.stamp !== sheet.targetStamp ? '#b75543' : '#247f87');
+    }
+    label(status.text, cardCenter, top + 78, 8, status.color, 'monospace', 'center');
     ctx.restore();
   }
   function drawBackdrop(state, reducedMotion) {
-    ctx.fillStyle = COLORS.cream; ctx.fillRect(0, 0, 1200, 760);
+    const mood = ATMOSPHERES[state.level.theme] || ATMOSPHERES.morning;
+    ctx.fillStyle = mood.background; ctx.fillRect(0, 0, 1200, 760);
     ctx.fillStyle = paperTexture;
     ctx.fillRect(0, 103, 1200, 560);
-    box(17, 109, 1166, 548, '#e5e7d2', '#d1d5bf', 15);
+    box(17, 109, 1166, 548, mood.frame, '#bcc8bb', 15);
     box(27, 120, 1146, 74, '#f5efdb', '#d3d2bd', 9);
-    label('ON THE ORDER RACK', 48, 141, 11, '#596564');
-    label('NEXT SHEET →', 48, 166, 13);
+    label('THE ORDER BOOK', 45, 138, 10, '#596564');
+    label('NEXT →', 45, 161, 17);
+    label('ROUTE BEFORE FEED', 45, 181, 8, '#68776b');
     state.incoming?.forEach((order, index) => {
-      const x = 257 + index * 161;
-      box(x - 67, 132, 137, 51, COLORS.paper, index === 0 ? COLORS.teal : '#d7d5c3', 5);
-      box(x - 54, 143, 29, 29, RECIPE_COLORS[order.targetMask], null, 4);
-      glyph(order.targetStamp, x - 39, 157, 9, COLORS.paper, false);
-      label(recipeName(order.targetMask).toUpperCase(), x - 15, 149, 10);
-      label(recipeSymbols(order.targetMask), x - 15, 166, 11, '#60706e');
+      const x = 186 + index * 170;
+      box(x, 128, 158, 59, COLORS.paper, index === 0 ? mood.accent : '#d7d5c3', 5);
+      poster(state.shiftIndex, order.targetMask, state.level.stamps ? order.targetStamp : null, x + 5, 132, 44, 49);
+      label(index === 0 ? 'NEXT ORDER' : 'AFTER ' + index, x + 56, 139, 7.5, '#788278');
+      label(recipeName(order.targetMask).toUpperCase(), x + 56, 153, 11);
+      label(recipeSymbols(order.targetMask), x + 56, 169, 11, mood.accent);
+      if (state.level.stamps) glyph(order.targetStamp, x + 143, 170, 5, COLORS.navy, true);
     });
-    const barWidth = 143, portion = Math.max(0, Math.min(1, (state.spawnClock || 0) / (state.level.spawnEvery || 4)));
-    label('FEEDER', 782, 147, 10, '#68716b');
-    box(782, 163, barWidth, 7, '#d9dcca', null, 3);
-    box(782, 163, barWidth * (1 - portion), 7, COLORS.teal, null, 3);
-    label('PRESS CO.', 1060, 146, 22, COLORS.navy, 'Georgia', 'center');
-    label('EST. THIS MORNING', 1060, 170, 9, '#697167', 'monospace', 'center');
+    const barWidth = 161, portion = Math.max(0, Math.min(1, (state.spawnClock || 0) / (state.level.spawnEvery || 4)));
+    label('FEEDS INTO LANE ' + (state.routingLane + 1), 720, 142, 8, '#68716b');
+    box(720, 155, barWidth, 8, '#d9dcca', null, 3);
+    box(720, 155, barWidth * (1 - portion), 8, mood.accent, null, 3);
+    label(Math.max(0, state.spawnClock).toFixed(1) + 's TO FEED', 720, 178, 9, mood.accent);
+    label('FRESH OFF THE PRESS', 919, 134, 8, '#697167');
+    for (let index = 0; index < 3; index++) {
+      const print = prints[prints.length - 3 + index];
+      const x = 922 + index * 71;
+      if (print) {
+        box(x + 2, 144, 51, 43, '#ddd7c4', null, 2);
+        poster(print.edition, print.mask, print.stamp, x + 4, 141, 40, 44);
+      } else {
+        box(x, 144, 49, 40, '#ebe9d8', '#d4d5c1', 3);
+        label('·', x + 24, 163, 24, '#b4bba9', 'Georgia', 'center');
+      }
+    }
     for (let lane = 0; lane < 3; lane++) {
       const y = BOARD.lanes[lane], chosen = state.routingLane === lane;
-      box(32, y - 57, 1136, 122, chosen ? '#d5e6d7' : '#e9e8d5', chosen ? '#77a7a0' : '#ccd1bb', 10);
+      box(32, y - 57, 1136, 122, chosen ? mood.selected : mood.lane, chosen ? '#77a7a0' : '#ccd1bb', 10);
+      if (state.selectedLane === lane && !chosen) { ctx.strokeStyle = mood.accent; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(120, y - 42); ctx.lineTo(120, y + 50); ctx.stroke(); }
       box(45, y - 44, 65, 102, chosen ? COLORS.navy : '#f6efdb', chosen ? null : '#bdc8b8', 8);
       label('LANE', 77, y - 21, 10, chosen ? COLORS.cream : '#68766c', 'monospace', 'center');
       label(String(lane + 1).padStart(2, '0'), 77, y + 6, 27, chosen ? COLORS.cream : COLORS.navy, 'monospace', 'center');
@@ -120,36 +178,38 @@ export function createRenderer(canvas) {
         box(x - 29, y - 56, 58, 35, enabled ? info.color : '#f9f1dc', '#2a445a', 8);
         label(info.short, x, y - 38, 18, enabled ? COLORS.navy : '#899188', 'monospace', 'center');
         ctx.beginPath(); ctx.arc(x + 21, y - 61, 4, 0, Math.PI * 2); ctx.fillStyle = enabled ? '#247f87' : '#b5b6a4'; ctx.fill();
-        label(enabled ? 'ON' : 'OFF', x, y + 58, 8, enabled ? COLORS.navy : '#728174', 'monospace', 'center');
+        const pulse = Math.max(0, ...effects.filter(effect => effect.type === 'print' && effect.lane === lane && effect.ink === ink).map(effect => 1 - effect.age / .32));
+        if (pulse > 0) { ctx.save(); ctx.globalAlpha = pulse * .7; box(x - 24, y - 14, 48, 25, info.color, null, 5); ctx.restore(); }
       }
       box(stampX - 28, y - 18, 56, 64, '#51615e', null, 6);
       box(stampX - 27, y - 56, 54, 35, state.level.stamps ? '#faeab6' : '#d6d9c4', '#52655c', 8);
       glyph(state.lanes[lane]?.stamp || 'circle', stampX, y - 38, 10, state.level.stamps ? COLORS.navy : '#9ea592', true);
-      label(state.level.stamps ? 'STAMP' : 'LATER', stampX, y + 58, 8, '#68776b', 'monospace', 'center');
+      label(state.level.stamps ? 'STAMP' : 'LATER', stampX, y - 68, 7, '#68776b', 'monospace', 'center');
       box(1073, y - 23, 57, 68, '#e9bc70', '#b5965c', 5);
       ctx.strokeStyle = '#c39f66'; ctx.beginPath(); ctx.moveTo(1076, y + 9); ctx.lineTo(1127, y + 9); ctx.moveTo(1100, y - 18); ctx.lineTo(1100, y + 43); ctx.stroke();
       label('SHIP', 1101, y - 35, 9, COLORS.navy, 'monospace', 'center');
     }
-    label('LAYER INK →', 163, 621, 11, '#6d776b');
-    label('C', inkX(0), 621, 13, '#247f87', 'monospace', 'center');
-    label('M', inkX(1), 621, 13, '#a84d69', 'monospace', 'center');
-    label('Y', inkX(2), 621, 13, '#9d7d28', 'monospace', 'center');
-    label('FINISH', stampX, 621, 11, '#6d776b', 'monospace', 'center');
-    label('PACK & SEND', 1058, 621, 11, '#6d776b', 'monospace', 'center');
+    label(EDITIONS[state.shiftIndex].name.toUpperCase() + ' · EDITION ' + String(state.shiftIndex + 1).padStart(2, '0'), 43, 624, 12, mood.accent);
+    label('READ → SET ROLLERS → ROUTE' + (state.level.stamps ? ' → STAMP' : '') + ' → SHIP', 1155, 624, 11, COLORS.navy, 'monospace', 'right');
+    label('SHIP ' + state.stats.quota + ' MATCHED POSTERS · Wrong proofs cost paper · Space buys time', 43, 645, 10, '#64766c');
+    label('Outlined dots = required · Filled dots = printed', 1155, 645, 9, '#64766c', 'monospace', 'right');
   }
   function acceptEvents(events) {
     for (const event of events) {
-      if (['ship', 'spoil', 'ink', 'stamp', 'recycle'].includes(event.type)) effects.push({ ...event, age: 0 });
-      if (event.type === 'ship') { prints.push({ mask: event.mask, stamp: event.stamp }); if (prints.length > 6) prints.shift(); }
+      if (['start', 'brief', 'title'].includes(event.type)) { effects.length = 0; prints.length = 0; clock = 0; }
+      if (event.type === 'brief' && Number.isInteger(event.index)) currentEdition = event.index;
+      if (['ship', 'spoil', 'print', 'stamp-sheet', 'ink', 'stamp', 'recycle'].includes(event.type)) effects.push({ ...event, age: 0 });
+      if (event.type === 'ship') { prints.push({ mask: event.mask, stamp: event.stamp, edition: event.edition ?? currentEdition }); if (prints.length > 3) prints.shift(); }
     }
     if (effects.length > 40) effects.splice(0, effects.length - 40);
   }
   function render(state, seconds = 0, preferences = {}) {
+    currentEdition = state.shiftIndex;
     clock += preferences.reducedMotion || state.stage !== 'play' ? 0 : seconds;
     drawBackdrop(state, preferences.reducedMotion);
     for (const sheet of state.sheets || []) {
-      const x = BOARD.left + BOARD.width * sheet.x, y = BOARD.lanes[sheet.lane] + 13;
-      paperCard(x, y, sheet.inkMask, sheet.targetMask, sheet.stamp, sheet.targetStamp, state.selectedLane === sheet.lane, sheet.id, state.level.stamps);
+      const x = BOARD.left + BOARD.width * sheet.x, y = BOARD.lanes[sheet.lane] + 20;
+      paperCard(x, y, sheet, state.selectedLane === sheet.lane, state.level.stamps, state.shiftIndex);
     }
     for (let index = effects.length - 1; index >= 0; index--) {
       const effect = effects[index]; effect.age += seconds;
@@ -160,12 +220,35 @@ export function createRenderer(canvas) {
         const good = effect.type === 'ship';
         label(good ? '+' + effect.points : 'PROOF LOST', 1026, y - 44 - (preferences.reducedMotion ? 0 : effect.age * 30), good ? 21 : 11, good ? '#207d70' : '#bf563e', 'monospace', 'center');
         if (good && !preferences.reducedMotion) for (let p = 0; p < 6; p++) { ctx.fillStyle = RECIPE_COLORS[effect.mask]; ctx.fillRect(1033 + Math.sin(p * 2.4) * effect.age * 60, y + Math.cos(p * 2.4) * effect.age * 65, 5, 7); }
+      } else if (effect.type === 'print' || effect.type === 'ink') {
+        const x = inkX(effect.ink ?? 0), info = INKS[effect.ink ?? 0];
+        if (effect.age < .32) {
+          ctx.globalAlpha = Math.max(0, 1 - effect.age / .32);
+          ctx.strokeStyle = info.color; ctx.lineWidth = 3;
+          rounded(x - 34, y - 59, 68, 41, 8); ctx.stroke();
+          if (effect.type === 'print') {
+            const drop = preferences.reducedMotion ? 0 : effect.age * 35;
+            for (let dot = 0; dot < 3; dot++) { ctx.beginPath(); ctx.arc(x - 10 + dot * 10, y + 8 + drop, 2.5, 0, Math.PI * 2); ctx.fillStyle = info.color; ctx.fill(); }
+          }
+        }
+      } else if (effect.type === 'stamp' || effect.type === 'stamp-sheet') {
+        if (effect.age < .35) {
+          ctx.globalAlpha = Math.max(0, 1 - effect.age / .35);
+          const spread = preferences.reducedMotion ? 0 : effect.age * 20;
+          ctx.strokeStyle = '#b28b37'; ctx.lineWidth = 2;
+          rounded(stampX - 32 - spread / 2, y - 59, 64 + spread, 41, 8); ctx.stroke();
+          if (effect.type === 'stamp-sheet') glyph(effect.stamp, stampX, y + 16, 12, '#ab8241', true);
+        }
+      } else if (effect.type === 'recycle') {
+        const x = BOARD.left + BOARD.width * (effect.x ?? .9);
+        const drop = preferences.reducedMotion ? 0 : effect.age * 24;
+        label('RECYCLED', Math.max(185, Math.min(1010, x)), y - 5 + drop, 10, '#997954', 'monospace', 'center');
       }
       ctx.globalAlpha = 1;
     }
     if (state.brake.remaining > 0) {
-      box(917, 117, 236, 25, '#e5f5ea', '#6ca58d', 5);
-      label('PRECISION BRAKE · ' + state.brake.remaining.toFixed(1) + 's', 1035, 130, 10, '#317960', 'monospace', 'center');
+      box(704, 171, 197, 20, '#e5f5ea', '#6ca58d', 5);
+      label('BRAKE · ' + state.brake.remaining.toFixed(1) + 's', 802, 181, 10, '#317960', 'monospace', 'center');
     }
   }
   return { render, acceptEvents, glyph, rosette };

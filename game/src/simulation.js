@@ -62,6 +62,7 @@ function prepareShift(state, index) {
     shipped: 0, spoiled: 0, recycled: 0, combo: 0, bestCombo: 0,
     quality: qualityMax, qualityMax, timeRemaining: state.level.duration,
     quota: state.level.quota, earned: 0, elapsed: 0,
+    specimen: null,
   };
   state.brake = { remaining: 0, cooldown: 0, ready: true, duration: 2.2 + state.upgrades.brake * 0.4 };
   state.recycle = { cooldown: 0, ready: true };
@@ -99,6 +100,7 @@ function finishShift(state, events) {
     quality: state.stats.quality, qualityMax: state.stats.qualityMax,
     seconds: Math.round(state.stats.elapsed), grade: shiftGrade(state.stats),
     timeBonus, qualityBonus,
+    specimen: state.stats.specimen,
   };
   state.history = [...state.history.filter(item => item.index < state.shiftIndex), result];
   state.stats.campaignScore = state.history.reduce((sum, shift) => sum + shift.score, 0);
@@ -123,7 +125,8 @@ function shipSheet(state, sheet, events) {
     const multiplier = 1 + Math.min(5, state.stats.combo - 1) * (0.12 + state.upgrades.combo * 0.024);
     const points = Math.round(state.level.points * multiplier);
     state.stats.score += points;
-    events.push(event('ship', { lane: sheet.lane, id: sheet.id, mask: sheet.inkMask, stamp: sheet.stamp, points, combo: state.stats.combo }));
+    state.stats.specimen = { edition: state.shiftIndex, mask: sheet.inkMask, stamp: sheet.stamp };
+    events.push(event('ship', { lane: sheet.lane, id: sheet.id, edition: state.shiftIndex, mask: sheet.inkMask, stamp: sheet.stamp, points, combo: state.stats.combo }));
     if (state.stats.combo > 1 && state.stats.combo % 5 === 0) events.push(event('combo', { combo: state.stats.combo }));
     if (state.stats.shipped >= state.stats.quota) finishShift(state, events);
   } else {
@@ -287,7 +290,7 @@ export function applyAction(state, action) {
         state.stats.combo = 0;
         state.recycle.cooldown = 8;
         state.recycle.ready = false;
-        events.push(event('recycle', { id: sheet.id, lane: sheet.lane }));
+        events.push(event('recycle', { id: sheet.id, lane: sheet.lane, x: sheet.x, mask: sheet.inkMask }));
       }
     }
   }

@@ -8,6 +8,8 @@ Run a little printing workshop through five colorful shifts. Route incoming pape
 
 PRINTSHIFT is an original 2D browser game with procedural artwork and synthesized sound. Every playable file lives under `game/`; the game uses no network service, external font, engine, or build step.
 
+Each shift prints its own original edition: Sunward, Color Parade, Fold & Fern, Night Post and Orbit Press. The order previews and moving paper share the same artwork, and your final collection shows the actual last good print you shipped in each shift. Required ink dots, completed layers and stamp status help you catch mistakes before dispatch. Roller flashes, stamp impressions and the fresh-print rack give every successful operation visible feedback.
+
 ## Play
 
 ```sh

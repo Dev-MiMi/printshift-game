@@ -3,6 +3,7 @@ import { createRenderer, hitTest } from './render.js';
 import { createInput } from './input.js';
 import { createAudio } from './audio.js';
 import { createInterface } from './interface.js';
+import { recipeSymbols } from './recipes.js';
 
 const canvas = document.getElementById('game');
 let state = createGame();
@@ -15,7 +16,14 @@ function consume(events) {
   for (const event of events) {
     audio.event(event);
     if (event.type === 'combo') ui.toast(event.combo + ' prints in a row! The press is singing.', 'good');
-    if (event.type === 'spoil') ui.toast('A proof was lost. Match its ink letters before dispatch.', 'bad');
+    if (event.type === 'spoil') {
+      const inkWrong = event.actualMask !== event.targetMask;
+      const stampWrong = state.level.stamps && event.actualStamp !== event.targetStamp;
+      const explanation = inkWrong && stampWrong ? 'Match both ink and stamp.'
+        : inkWrong ? `Needed ${recipeSymbols(event.targetMask)}. Extra ink cannot be removed.`
+        : `Needed the ${event.targetStamp} stamp. Change it before the finish press.`;
+      ui.toast('Proof lost · ' + explanation, 'bad');
+    }
     if (event.type === 'shift-complete' || event.type === 'victory') document.getElementById('status').textContent = 'Shift delivered. Score ' + state.stats.score + '. ' + state.stage;
   }
 }
