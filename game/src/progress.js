@@ -2,8 +2,9 @@
 const STORAGE_KEY = 'printshift-workshop-v3';
 const emptyProgress = () => ({ version: 1, collections: 0, bestCampaign: 0, dailyBests: {}, editions: [], masteredClients: [] });
 
-export function loadProgress(storage = globalThis.localStorage) {
+export function loadProgress(storage) {
   try {
+    storage ??= globalThis.localStorage;
     const saved = JSON.parse(storage?.getItem(STORAGE_KEY) || 'null');
     if (!saved || saved.version !== 1) return emptyProgress();
     const progress = emptyProgress();
@@ -18,7 +19,7 @@ export function loadProgress(storage = globalThis.localStorage) {
   } catch { return emptyProgress(); }
 }
 
-export function rememberCollection(progress, state, storage = globalThis.localStorage) {
+export function rememberCollection(progress, state, storage) {
   const next = { ...progress, dailyBests: { ...progress.dailyBests }, editions: [...progress.editions], masteredClients: [...progress.masteredClients] };
   if (state.mode === 'practice') return next;
   for (const result of state.history) {
@@ -36,7 +37,7 @@ export function rememberCollection(progress, state, storage = globalThis.localSt
       next.dailyBests = Object.fromEntries(Object.entries(next.dailyBests).sort().slice(-14));
     }
   }
-  try { storage?.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* The game remains playable when storage is unavailable. */ }
+  try { (storage ?? globalThis.localStorage)?.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* The game remains playable when storage is unavailable. */ }
   return next;
 }
 
