@@ -249,6 +249,12 @@ kbd { display: inline-block; font: 700 0.83cqw monospace; }
 .archive-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1.4cqw; }
 .archive-grid .collection-card { width: 100%; }
 .archive-panel .panel-intro { margin: auto; }
+.result-panel { padding-top: .85cqw; padding-bottom: .85cqw; }
+.result-panel .result-specimen { width: 5.2cqw; flex-basis: 5.2cqw; }
+.result-panel .result-metrics { margin-top: .65cqw; padding: .65cqw 0; }
+.result-panel .result-metrics strong { font-size: 2.7cqw; }
+.result-panel .upgrade-grid { margin-top: .7cqw; }
+.result-panel .upgrade-detail { min-height: 2.8cqw; }
 @media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; animation: none !important; } }
 @media (max-width: 700px) {
   .panel-intro { font-size: 1.35cqw; }
