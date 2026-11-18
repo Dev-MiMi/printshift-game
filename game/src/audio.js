@@ -116,6 +116,16 @@ export function createAudio() {
       tone(147, 0.08, 0.07);
     } else if (type === 'brake') {
       tone(260, 0.23, 0.055, 'sine', 0, 95);
+    } else if (type === 'transfer') {
+      tone(220, .12, .09, 'triangle', 0, 440);
+      paper(.10, .045, 1900);
+    } else if (type === 'commission-complete' || type === 'proof-recovered') {
+      chord([523.25, 659.25, 783.99, 1046.5], .08);
+    } else if (type === 'batch') {
+      tone(880, .08, .045, 'sine');
+    } else if (type === 'commission-picked') {
+      paper(.08, .05, 1500);
+      tone(330, .07, .05);
     } else if (type === 'upgrade' || type === 'shift-complete') {
       chord([392, 493.88, 587.33, 783.99]);
     } else if (type === 'victory') {

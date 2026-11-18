@@ -43,10 +43,25 @@ export const SHIFTS = Object.freeze([
 ]);
 
 export const UPGRADES = Object.freeze([
-  { id: 'quality', title: 'Extra proof paper', description: 'One extra quality point in every remaining shift.', short: '+1 quality' },
-  { id: 'brake', title: 'Precision brake', description: 'Brakes last longer and cool down sooner.', short: 'Better brakes' },
-  { id: 'combo', title: 'Signature finish', description: 'Good print combos earn extra points.', short: '+20% combo bonus' },
+  { id: 'quality', title: 'Extra proof paper', description: 'One extra proof point in every remaining shift.', short: '+1 proof', icon: '✓', benefit: 'Room for one mistake', strategy: 'A safety net for rush commissions.' },
+  { id: 'brake', title: 'Precision brake', description: 'Brakes last 0.4 seconds longer and cool down 1.5 seconds sooner.', short: 'Better brakes', icon: 'Ⅱ', benefit: 'More thinking time', strategy: 'Set several lanes while the belts slow.' },
+  { id: 'combo', title: 'Signature finish', description: 'Consecutive good prints earn 20% more combo bonus.', short: 'Better combos', icon: '✳', benefit: 'Reward a clean streak', strategy: 'A strong match for Corner Books.' },
+  { id: 'transfer', title: 'Crossfeed carriage', description: 'Moving paper between lanes cools down 1.5 seconds sooner.', short: 'Faster crossfeed', icon: '⇅', benefit: 'Move, then layer', strategy: 'Use Q/E to send unfinished paper to a ready lane.' },
+  { id: 'reclaim', title: 'Paper recovery', description: 'Recycling keeps your combo; every second recycle restores one proof point. A second upgrade restores on every recycle.', short: 'Recover proofs', icon: '♲', benefit: 'Save a troubled run', strategy: 'Recovery costs time, but preserves your streak.' },
+  { id: 'batch', title: 'Batch memory', description: 'Ship the same ink recipe twice in a row for +60 points and 0.6 seconds per upgrade.', short: 'Reward repeat inks', icon: '▤', benefit: 'Keep a favorite lane', strategy: 'Pairs and spot-color commissions reward planning.' },
 ]);
+
+export function upgradeOffers(seed, index, upgrades) {
+  if (index === 0) return ['transfer', 'brake', 'quality'];
+  const choices = UPGRADES.filter(item => (upgrades[item.id] || 0) < 2).map(item => item.id);
+  let random = (seed ^ Math.imul(index + 1, 374761393)) >>> 0;
+  for (let i = choices.length - 1; i > 0; i--) {
+    random = (Math.imul(random, 1664525) + 1013904223) >>> 0;
+    const j = random % (i + 1);
+    [choices[i], choices[j]] = [choices[j], choices[i]];
+  }
+  return choices.slice(0, 3);
+}
 
 export function shiftGrade(stats) {
   const ratio = stats.spoiled / Math.max(1, stats.shipped + stats.spoiled);

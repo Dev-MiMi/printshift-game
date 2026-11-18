@@ -1,5 +1,6 @@
 import { UPGRADES, SHIFTS } from './levels.js';
 import { EDITIONS, posterMarkup } from './posters.js';
+import { commissionObjective, runLabel } from './commissions.js';
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 const number = value => Math.max(0, Math.round(Number(value) || 0)).toLocaleString('en-US');
@@ -28,20 +29,36 @@ function scoreBreakdown(state, final = false) {
   const results = final ? state.history || [] : [state.history?.at(-1)].filter(Boolean);
   const timeBonus = results.reduce((sum, result) => sum + (result.timeBonus || 0), 0);
   const qualityBonus = results.reduce((sum, result) => sum + (result.qualityBonus || 0), 0);
+  const commissionBonus = results.reduce((sum, result) => sum + (result.commissionBonus || 0), 0);
   const score = final ? state.stats?.campaignScore : state.stats?.score;
-  return `<div class="score-breakdown" aria-label="Score breakdown"><span><small>PRINTS + COMBOS</small><b>${number((score || 0) - timeBonus - qualityBonus)}</b></span><span><small>TIME BONUS</small><b>+${number(timeBonus)}</b></span><span><small>PROOF BONUS</small><b>+${number(qualityBonus)}</b></span></div>`;
+  return `<div class="score-breakdown" aria-label="Score breakdown"><span><small>PRINTS + COMBOS</small><b>${number((score || 0) - timeBonus - qualityBonus - commissionBonus)}</b></span><span><small>TIME</small><b>+${number(timeBonus)}</b></span><span><small>PROOFS</small><b>+${number(qualityBonus)}</b></span><span><small>CLIENT BONUS</small><b>+${number(commissionBonus)}</b></span></div>`;
 }
 
 function upgradeCards(state) {
-  const benefits = {
-    quality: { label: 'PROOF PAPER', benefit: '+1 proof point', detail: 'An extra safety point in every remaining shift.', icon: '✓' },
-    brake: { label: 'PRECISION BRAKE', benefit: '+0.4s braking', detail: 'Brake again 1.5 seconds sooner.', icon: 'Ⅱ' },
-    combo: { label: 'SIGNATURE FINISH', benefit: '+20% combo bonus', detail: 'Earn more from consecutive good prints.', icon: '✳' },
-  };
-  return `<div class="upgrade-heading"><b>Choose your next advantage.</b><span>Pick one free upgrade · lasts for all remaining shifts</span></div><div class="upgrade-grid">${UPGRADES.map(item => {
-    const benefit = benefits[item.id];
-    return `<button class="upgrade-card upgrade-${item.id}" data-action="upgrade" data-choice="${item.id}"><span class="upgrade-label"><i aria-hidden="true">${benefit.icon}</i>${benefit.label}</span><b class="upgrade-benefit">${benefit.benefit}</b><span class="upgrade-detail">${benefit.detail}</span><span class="upgrade-select">Choose upgrade <span aria-hidden="true">↗</span></span></button>`;
-  }).join('')}</div>`;
+  return `<div class="upgrade-heading"><b>Build your workshop.</b><span>One free upgrade · then choose your next client</span></div><div class="upgrade-grid">${state.upgradeOffers.map(id => UPGRADES.find(item => item.id === id)).map(item =>
+    `<button class="upgrade-card upgrade-${item.id}" data-action="upgrade" data-choice="${item.id}"><span class="upgrade-label"><i aria-hidden="true">${item.icon}</i>${escapeHtml(item.title.toUpperCase())}</span><b class="upgrade-benefit">${escapeHtml(item.benefit)}</b><span class="upgrade-detail">${escapeHtml(item.description)}</span><span class="upgrade-select">Install ${state.upgrades[item.id] ? 'level 2' : 'upgrade'} <span aria-hidden="true">↗</span></span></button>`
+  ).join('')}</div>`;
+}
+
+function installedUpgrades(state) {
+  const installed = UPGRADES.filter(item => state.upgrades[item.id] > 0);
+  return `<div class="installed-upgrades"><small>YOUR WORKSHOP</small>${installed.length ? installed.map(item => `<span>${item.icon} ${escapeHtml(item.title)}${state.upgrades[item.id] > 1 ? ' II' : ''}</span>`).join('') : '<span>Standard press · Crossfeed unlocks after shift 1</span>'}</div>`;
+}
+
+function commissionCards(state) {
+  if (state.mode === 'daily') {
+    const commission = state.commissionChoices.find(item => item.id === state.pendingCommission);
+    return `<div class="daily-route"><b>Next daily client: ${escapeHtml(commission.name)}</b><p>${escapeHtml(commission.rule)} ${escapeHtml(commissionObjective(commission))} for +${commission.bonus}.</p></div>`;
+  }
+  return `<div class="upgrade-heading"><b>Who will you print for?</b><span>Both complete your collection · mastery earns a client bonus</span></div><div class="commission-grid">${state.commissionChoices.map(client =>
+    `<button class="commission-card ${state.pendingCommission === client.id ? 'is-picked' : ''}" data-action="commission" data-choice="${client.id}" aria-pressed="${state.pendingCommission === client.id}"><span class="client-name"><i aria-hidden="true">${client.icon}</i>${escapeHtml(client.name)}</span><b>${escapeHtml(client.title)}</b><span class="client-rule">${escapeHtml(client.rule)}</span><span class="client-objective">${escapeHtml(commissionObjective(client))} <strong>+${client.bonus}</strong></span><span class="client-select">${state.pendingCommission === client.id ? 'Commission selected ✓' : 'Choose this commission ↗'}</span></button>`
+  ).join('')}</div>`;
+}
+
+function commissionSummary(state, final = false) {
+  if (state.mode === 'practice') return '';
+  const commissions = final ? state.history.map(result => result.commission).filter(Boolean) : [state.commission].filter(Boolean);
+  return `<div class="client-results">${commissions.map(client => `<span class="${client.completed ? 'is-mastered' : ''}">${client.completed ? '✓' : '○'} ${escapeHtml(client.name)} <b>${client.completed ? 'MASTERED' : client.progress + '/' + client.target}</b></span>`).join('')}</div>`;
 }
 
 function lessons(state) {
@@ -65,8 +82,9 @@ function controlsMarkup(state) {
   const blocked = playing ? '' : 'disabled';
   const brake = state.brake || {};
   const recycle = state.recycle || {};
+  const transfer = state.transfer || {};
   const brakeLabel = brake.remaining > 0 ? 'Slowing' : brake.ready ? 'Brake' : `${Math.ceil(brake.cooldown || 0)}s`;
-  return `<div class="routing-controls"><small>ROUTE NEXT SHEET</small><div class="lane-switches">${[0, 1, 2].map(index => `<button class="lane-key ${state.routingLane === index ? 'is-selected' : ''}" data-action="route" data-lane="${index}" aria-pressed="${state.routingLane === index}" ${blocked}><kbd>${index + 1}</kbd> Lane ${index + 1}</button>`).join('')}</div></div><div class="ink-controls"><small>LANE ${lane + 1} ROLLERS</small><div class="ink-switches">${['C', 'M', 'Y'].map((ink, index) => `<button class="ink-key ink-${ink.toLowerCase()} ${mask & (1 << index) ? 'is-on' : ''}" data-action="toggle-ink" data-lane="${lane}" data-ink="${index}" aria-pressed="${Boolean(mask & (1 << index))}" ${blocked}><kbd>${ink}</kbd><span>${['●', '◆', '▲'][index]}</span></button>`).join('')}${state.level?.stamps ? `<button class="tool-key stamp-key" data-action="cycle-stamp" data-lane="${lane}" ${blocked}><kbd>S</kbd><span>${stampGlyph(stamp)}</span></button>` : ''}</div></div><div class="utility-controls"><button class="tool-key brake-key ${brake.remaining > 0 ? 'is-active' : ''}" data-action="brake" ${!playing || !brake.ready ? 'disabled' : ''}><kbd>SPACE</kbd>${brakeLabel}</button><button class="tool-key" data-action="recycle" ${!playing || !recycle.ready ? 'disabled' : ''}><kbd>R</kbd>${recycle.ready ? 'Recycle' : `${Math.ceil(recycle.cooldown || 0)}s`}</button><button class="tool-key" data-action="pause" ${blocked}><kbd>P</kbd>Pause</button></div>`;
+  return `<div class="routing-controls"><small>ROUTE NEXT SHEET</small><div class="lane-switches">${[0, 1, 2].map(index => `<button class="lane-key ${state.routingLane === index ? 'is-selected' : ''}" data-action="route" data-lane="${index}" aria-pressed="${state.routingLane === index}" ${blocked}><kbd>${index + 1}</kbd> Lane ${index + 1}</button>`).join('')}</div></div><div class="ink-controls"><small>LANE ${lane + 1} ROLLERS</small><div class="ink-switches">${['C', 'M', 'Y'].map((ink, index) => `<button class="ink-key ink-${ink.toLowerCase()} ${mask & (1 << index) ? 'is-on' : ''}" data-action="toggle-ink" data-lane="${lane}" data-ink="${index}" aria-pressed="${Boolean(mask & (1 << index))}" ${blocked}><kbd>${ink}</kbd><span>${['●', '◆', '▲'][index]}</span></button>`).join('')}${state.level?.stamps ? `<button class="tool-key stamp-key" data-action="cycle-stamp" data-lane="${lane}" ${blocked}><kbd>S</kbd><span>${stampGlyph(stamp)}</span></button>` : ''}</div></div><div class="utility-controls">${transfer.enabled ? `<div class="crossfeed-tools" aria-label="Crossfeed the leading paper before the stamp press"><small>${transfer.ready ? 'CROSSFEED' : Math.ceil(transfer.cooldown) + 's'}</small><div><button class="tool-key" data-action="transfer" data-direction="-1" ${!playing || !transfer.ready ? 'disabled' : ''}><kbd>Q</kbd>↑</button><button class="tool-key" data-action="transfer" data-direction="1" ${!playing || !transfer.ready ? 'disabled' : ''}><kbd>E</kbd>↓</button></div></div>` : ''}<button class="tool-key brake-key ${brake.remaining > 0 ? 'is-active' : ''}" data-action="brake" ${!playing || !brake.ready ? 'disabled' : ''}><kbd>SPACE</kbd>${brakeLabel}</button><button class="tool-key" data-action="recycle" ${!playing || !recycle.ready ? 'disabled' : ''}><kbd>R</kbd>${recycle.ready ? 'Recycle' : `${Math.ceil(recycle.cooldown || 0)}s`}</button><button class="tool-key" data-action="pause" ${blocked}><kbd>P</kbd>Pause</button></div>`;
 }
 
 /** DOM controls only: the same simulation action is used by keyboard and mouse. */
@@ -98,6 +116,7 @@ export function createInterface({ onAction = () => {}, onPreference = () => {} }
     if (target.dataset.ink !== undefined) action.ink = Number(target.dataset.ink);
     if (target.dataset.choice) action.choice = target.dataset.choice;
     if (target.dataset.mode) action.mode = target.dataset.mode;
+    if (target.dataset.direction !== undefined) action.direction = Number(target.dataset.direction);
     onAction(action);
   }
 
@@ -113,24 +132,36 @@ export function createInterface({ onAction = () => {}, onPreference = () => {} }
     const stats = state.stats || {};
     const level = state.level || SHIFTS[0];
     if (stage === 'title') {
-      return `<section class="panel title-panel"><div class="edition-line"><span>AN ORIGINAL PRINTING WORKSHOP</span><span>FIVE EDITIONS / ONE COLLECTION</span></div><h1 class="brand-title">PRINT<span>SHIFT</span><i aria-hidden="true">✳</i></h1><p class="title-tagline">Match every order. Master all five shifts.</p><p class="panel-intro title-intro">Mix inks, route paper, and match the final stamp.<br>Finish before the courier leaves; keep your proof paper intact.</p>${previewPosters()}<div class="panel-actions">${button('Start five-shift campaign <span aria-hidden="true">↗</span>', 'start', { attributes: 'data-mode="campaign"' })}${button('Practice the press', 'start', { secondary: true, attributes: 'data-mode="practice"' })}</div><div class="title-foot"><p>Mouse + keyboard <span>·</span> Play offline</p>${preferencesMarkup()}</div></section>`;
+      const progress = state.progress || {};
+      return `<section class="panel title-panel"><div class="edition-line"><span>AN ORIGINAL PRINTING WORKSHOP</span><span>FIVE EDITIONS / FOUR CLIENTS</span></div><h1 class="brand-title">PRINT<span>SHIFT</span><i aria-hidden="true">✳</i></h1><p class="title-tagline">Build your press. Print your own path.</p><p class="panel-intro title-intro">Layer inks, crossfeed paper, and match the final stamp.<br>Choose your clients and upgrades. Beat the courier. Master their commissions.</p>${previewPosters()}<div class="title-records"><span>PERSONAL BEST <b>${number(progress.bestCampaign)}</b></span><span>CLIENTS MASTERED <b>${progress.masteredClients?.length || 0}/4</b></span>${button('Your print archive ↗', 'collection', { secondary: true, attributes: 'data-compact="true"' })}</div><div class="panel-actions mode-actions">${button('Start five-shift campaign <span aria-hidden="true">↗</span>', 'start', { attributes: 'data-mode="campaign"' })}${button('Daily challenge', 'start', { secondary: true, attributes: 'data-mode="daily"' })}${button('Practice', 'start', { secondary: true, attributes: 'data-mode="practice"' })}</div><div class="title-foot"><p>Mouse + keyboard <span>·</span> Offline <span>·</span> Daily ${state.dailySeed || ''}</p>${preferencesMarkup()}</div></section>`;
+    }
+    if (stage === 'collection') {
+      const progress = state.progress || {};
+      const collected = progress.editions || [];
+      return `<section class="panel archive-panel">${heading('YOUR LOCAL PRINT ARCHIVE', 'Keep what you make.', 'Completed shifts save real prints here. Master all four clients and collect different color editions.')}<div class="archive-stats"><span><b>${number(progress.collections)}</b> collections</span><span><b>${collected.length}</b> color editions</span><span><b>${progress.masteredClients?.length || 0}/4</b> clients mastered</span></div><div class="archive-grid">${EDITIONS.map((edition, index) => {
+        const copies = collected.filter(item => item.edition === index);
+        return `<div>${editionPoster(copies.at(-1) || { edition: index, mask: 0, stamp: null }, { grade: copies.length ? copies.length + ' COLOR EDITION' + (copies.length > 1 ? 'S' : '') : 'NOT PRINTED', className: 'collection-card' })}</div>`;
+      }).join('')}</div><p class="result-note">Personal best ${number(progress.bestCampaign)} · Saved on this browser</p><div class="panel-actions">${button('Print another collection', 'start', { attributes: 'data-mode="campaign"' })}${button('Back to title', 'title', { secondary: true })}</div></section>`;
     }
     if (stage === 'brief') {
-      return `<section class="panel brief-panel">${heading(state.mode === 'practice' ? 'THE APPRENTICE DESK' : level.subtitle, level.title, level.brief)}<div class="brief-target"><span class="target-seal" aria-hidden="true">✓</span><div><small>YOUR ORDER BOOK</small><strong>Ship ${stats.quota || level.quota} good prints</strong><p>${state.mode === 'practice' ? 'A gentler pace to learn the press.' : `${Math.ceil(level.duration)} seconds · ${stats.qualityMax || level.qualityMax} proof-paper points`}</p></div></div>${lessons(state)}<p class="tip-line"><b>Press tip</b> ${escapeHtml(level.hint)}</p><div class="panel-actions">${button('Start printing <span aria-hidden="true">→</span>', 'begin')}${button('Back to workshop', 'title', { secondary: true })}</div>${preferencesMarkup()}</section>`;
+      const crossfeedLesson = state.transfer.enabled ? ' Q/E moves the leading paper up/down a lane before the stamp. Ink already printed stays on it.' : '';
+      const clientBrief = state.commission ? `<div class="brief-client"><b>${escapeHtml(state.commission.name)}</b><span>${escapeHtml(state.commission.rule)}</span><strong>${escapeHtml(commissionObjective(state.commission))} · +${state.commission.bonus}</strong></div>` : '';
+      return `<section class="panel brief-panel">${heading(state.mode === 'practice' ? 'THE APPRENTICE DESK' : state.mode === 'daily' ? runLabel(state) + ' · THREE MASTER SHIFTS' : level.subtitle, level.title, state.shiftIndex === 0 || state.mode === 'practice' ? level.brief : `Ship ${stats.quota} good prints. ${level.stamps ? 'Match each recipe and finishing stamp.' : 'Match the ink layers on each order.'}`)}<div class="brief-target"><span class="target-seal" aria-hidden="true">✓</span><div><small>YOUR ORDER BOOK</small><strong>Ship ${stats.quota || level.quota} good prints</strong><p>${state.mode === 'practice' ? 'A gentler pace to learn the press.' : `${Math.ceil(level.duration)} seconds · ${stats.qualityMax || level.qualityMax} proof-paper points`}</p></div></div>${clientBrief}${state.shiftIndex === 0 || state.mode === 'practice' ? lessons(state) : installedUpgrades(state)}<p class="tip-line"><b>Press tip</b> ${escapeHtml(level.hint + crossfeedLesson)}</p><div class="panel-actions">${button('Start printing <span aria-hidden="true">→</span>', 'begin')}${button('Back to workshop', 'title', { secondary: true })}</div>${preferencesMarkup()}</section>`;
     }
     if (stage === 'paused') {
-      return `<section class="panel pause-panel">${heading('THE PRESS IS RESTING', 'Take a breather.', 'Your paper and clock are paused.')}<div class="pause-summary"><strong>${number(stats.shipped)} / ${number(stats.quota)}</strong><span>good prints this shift</span></div><p class="tip-line">Route with <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>, switch inks with <kbd>C</kbd> <kbd>M</kbd> <kbd>Y</kbd>, brake with <kbd>Space</kbd>.${level.stamps ? ' Stamp with S.' : ''}</p><div class="panel-actions">${button('Back to the press', 'resume')}${button('Retry this shift', 'retry', { secondary: true })}</div>${button('Return to title', 'title', { secondary: true, attributes: 'data-compact="true"' })}${preferencesMarkup()}</section>`;
+      return `<section class="panel pause-panel">${heading('THE PRESS IS RESTING', 'Take a breather.', 'Your paper and clock are paused.')}<div class="pause-summary"><strong>${number(stats.shipped)} / ${number(stats.quota)}</strong><span>good prints this shift</span></div><p class="tip-line">Route with <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>, switch inks with <kbd>C</kbd> <kbd>M</kbd> <kbd>Y</kbd>, brake with <kbd>Space</kbd>.${level.stamps ? ' Stamp with S.' : ''}${state.transfer.enabled ? ' Q/E crossfeeds unfinished paper.' : ''}</p>${installedUpgrades(state)}<div class="panel-actions">${button('Back to the press', 'resume')}${button('Retry this shift', 'retry', { secondary: true })}</div>${button('Return to title', 'title', { secondary: true, attributes: 'data-compact="true"' })}${preferencesMarkup()}</section>`;
     }
     if (stage === 'shift-complete') {
       const result = state.history?.[state.history.length - 1];
-      const upgrade = UPGRADES.find(item => item.id === state.upgradeChosen);
       const edition = EDITIONS[state.shiftIndex] || EDITIONS[0];
-      const upgradeSection = state.upgradeAvailable ? upgradeCards(state) : `<p class="upgrade-picked">${upgrade ? `Upgrade installed: <b>${escapeHtml(upgrade.title)}</b>` : 'The next order book is ready.'}<span>${SHIFTS.length - state.shiftIndex - 1} shifts left to complete your collection.</span></p>`;
-      return `<section class="panel result-panel"><div class="shift-result-heading">${editionPoster(result?.specimen || { edition: state.shiftIndex, mask: 0 }, { className: 'result-specimen' })}<div><div class="result-stamp">${escapeHtml(result?.grade || 'DELIVERED')}</div>${heading(`SHIFT ${String(state.shiftIndex + 1).padStart(2, '0')} / 05 DELIVERED`, 'Fresh off the press.', `${edition.name} is ready for the courier.`)}</div></div>${resultMetrics(state)}${scoreBreakdown(state)}${upgradeSection}<div class="panel-actions">${button('Next shift <span aria-hidden="true">→</span>', 'next')}${button('Retry for a cleaner run', 'retry', { secondary: true })}</div></section>`;
+      const nextSection = state.upgradeAvailable ? upgradeCards(state) : commissionCards(state);
+      return `<section class="panel result-panel"><div class="shift-result-heading">${editionPoster(result?.specimen || { edition: state.shiftIndex, mask: 0 }, { className: 'result-specimen' })}<div><div class="result-stamp">${escapeHtml(result?.grade || 'DELIVERED')}</div>${heading(`SHIFT ${String(state.shiftIndex + 1).padStart(2, '0')} / 05 DELIVERED`, 'Fresh off the press.', `${edition.name} is ready for the courier.`)}</div></div>${resultMetrics(state)}${scoreBreakdown(state)}${commissionSummary(state)}${installedUpgrades(state)}${nextSection}<div class="panel-actions">${button('Next shift <span aria-hidden="true">→</span>', 'next', { disabled: !state.pendingCommission || state.upgradeAvailable })}${button('Retry for a cleaner run', 'retry', { secondary: true })}</div></section>`;
     }
     if (stage === 'victory') {
       const practice = state.mode === 'practice';
-      return `<section class="panel victory-panel"><div class="result-stamp">${practice ? 'APPRENTICE APPROVED' : 'COLLECTION COMPLETE'}</div>${heading(practice ? 'THE RHYTHM IS YOURS' : 'ALL FIVE SHIFTS DELIVERED', practice ? 'You’ve got the knack.' : 'Made by your hands.', practice ? 'Match the inks. Prepare the lane. Ship good prints.' : 'Five original editions, printed and delivered.')} ${resultMetrics(state, true)}${scoreBreakdown(state, true)}${practice ? previewPosters() : `<div class="collection-row" aria-label="Your five printed editions">${(state.history || []).map((item, index) => editionPoster(item.specimen || { edition: index, mask: 0 }, { grade: item.grade, className: 'collection-card' })).join('')}</div>`}<div class="panel-actions">${practice ? button('Start five-shift campaign', 'start', { attributes: 'data-mode="campaign"' }) : button('Print another collection', 'restart')}${button('Back to title', 'title', { secondary: true })}</div><p class="result-note">${practice ? 'Ready for all five shifts? Your first real order starts gently.' : 'Replay for a cleaner collection, longer combos, and different upgrades.'}</p></section>`;
+      const daily = state.mode === 'daily';
+      const best = daily ? state.progress?.dailyBests?.[state.seed] : state.progress?.bestCampaign;
+      return `<section class="panel victory-panel"><div class="result-stamp">${practice ? 'APPRENTICE APPROVED' : daily ? 'DAILY CHALLENGE COMPLETE' : 'COLLECTION COMPLETE'}</div>${heading(practice ? 'THE RHYTHM IS YOURS' : daily ? runLabel(state) : 'ALL FIVE SHIFTS DELIVERED', practice ? 'You’ve got the knack.' : 'Made by your hands.', practice ? 'Match the inks. Prepare the lane. Ship good prints.' : daily ? 'Three master shifts. One shared daily order book.' : 'Five original editions, printed and delivered.')} ${resultMetrics(state, true)}${scoreBreakdown(state, true)}${commissionSummary(state, true)}${practice ? previewPosters() : `<div class="collection-row" aria-label="Your printed editions">${(state.history || []).map(item => editionPoster(item.specimen || { edition: item.index, mask: 0 }, { grade: item.grade, className: 'collection-card' })).join('')}</div>`}<div class="panel-actions">${practice ? button('Start five-shift campaign', 'start', { attributes: 'data-mode="campaign"' }) : button(daily ? 'Replay today’s challenge' : 'Print a new collection', 'restart')}${button('Back to title', 'title', { secondary: true })}</div><p class="result-note">${practice ? 'Ready for all five shifts? Your first real order starts gently.' : `PERSONAL BEST ${number(best)} · ${daily ? 'Same seed, a different upgrade strategy.' : 'New commissions, new upgrades, new color editions.'}`}</p></section>`;
     }
     return `<section class="panel failure-panel"><div class="result-stamp stamp-coral">REPRINT REQUESTED</div>${heading('EVERY MAKER LEARNS', 'Back to the proof desk.', state.failureReason || state.notice || 'This order book needs another try.')} ${resultMetrics(state)}<div class="failure-tip"><b>Make your next run count.</b><p>Read two orders ahead. A roller changes every sheet passing it, so prepare a lane before routing paper. Use the brake to regain your rhythm.</p></div><div class="panel-actions">${button('Retry this shift', 'retry')}${button('Back to title', 'title', { secondary: true })}</div><p class="result-note">Your earlier completed shifts stay in the collection.</p></section>`;
   }
@@ -147,7 +178,7 @@ export function createInterface({ onAction = () => {}, onPreference = () => {} }
       hudSignature = signature;
       hud.innerHTML = `<div class="hud-brand"><span class="brand-mark" aria-hidden="true">✳</span><div><b>PRINTSHIFT</b><small>${stage === 'title' ? 'THE INDEPENDENT PRESS' : state.mode === 'practice' ? 'APPRENTICE PRACTICE' : `SHIFT ${String(state.shiftIndex + 1).padStart(2, '0')} / 05`}</small></div></div><div class="hud-stat printed-stat"><small>GOOD PRINTS</small><strong>${number(stats.shipped)}<span> / ${number(stats.quota)}</span></strong></div><div class="hud-stat"><small>SCORE <i class="combo-pill ${stats.combo > 1 ? 'has-combo' : ''}">${stats.combo > 1 ? `${stats.combo}× COMBO` : ''}</i></small><strong>${number(stats.score)}</strong></div><div class="hud-stat quality-stat"><small>PROOF PAPER</small><strong class="quality-pips" aria-label="${stats.quality || 0} of ${stats.qualityMax || 0} quality points">${Array.from({ length: Math.min(12, stats.qualityMax || 0) }, (_, index) => `<i class="${index < (stats.quality || 0) ? 'is-full' : ''}"></i>`).join('')}</strong></div><div class="hud-stat timer-stat ${time <= 15 && stage === 'play' ? 'is-urgent' : ''}"><small>TIME LEFT</small><strong>${seconds}</strong></div><button class="sound-button" data-preference="muted" aria-label="${preferences.muted ? 'Turn sound on' : 'Mute sound'}" aria-pressed="${Boolean(preferences.muted)}">${preferences.muted ? '♪̸' : '♪'}</button>`;
     }
-    const nextScreen = [stage, state.mode, state.shiftIndex, state.upgradeAvailable, state.upgradeChosen, state.notice, stats.score, preferences.muted, preferences.reducedMotion].join('|');
+    const nextScreen = [stage, state.mode, state.shiftIndex, state.upgradeAvailable, state.upgradeChosen, state.pendingCommission, state.notice, stats.score, state.seed, state.progress?.collections, preferences.muted, preferences.reducedMotion].join('|');
     if (nextScreen !== screenSignature) {
       screenSignature = nextScreen;
       overlay.innerHTML = renderScreen(state);
@@ -155,7 +186,7 @@ export function createInterface({ onAction = () => {}, onPreference = () => {} }
       overlay.className = `screen-overlay screen-${stage}`;
       if (status && stage !== 'play') status.textContent = overlay.textContent.replace(/\s+/g, ' ').trim();
     }
-    const nextControls = [stage, state.selectedLane, state.routingLane, ...(state.lanes || []).flatMap(lane => [lane.inkMask, lane.stamp]), state.level?.stamps, state.brake?.remaining > 0, state.brake?.ready, Math.ceil(state.brake?.cooldown || 0), state.recycle?.ready, Math.ceil(state.recycle?.cooldown || 0)].join('|');
+    const nextControls = [stage, state.selectedLane, state.routingLane, ...(state.lanes || []).flatMap(lane => [lane.inkMask, lane.stamp]), state.level?.stamps, state.brake?.remaining > 0, state.brake?.ready, Math.ceil(state.brake?.cooldown || 0), state.recycle?.ready, Math.ceil(state.recycle?.cooldown || 0), state.transfer?.enabled, state.transfer?.ready, Math.ceil(state.transfer?.cooldown || 0)].join('|');
     if (nextControls !== controlSignature) {
       controlSignature = nextControls;
       controls.innerHTML = controlsMarkup(state);

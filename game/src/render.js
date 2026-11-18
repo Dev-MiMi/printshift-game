@@ -1,5 +1,6 @@
 import { INKS, INK_STATIONS, RECIPE_COLORS, STAMP_X, recipeName, recipeSymbols } from './recipes.js';
 import { EDITIONS, drawPoster } from './posters.js';
+import { commissionObjective, runLabel } from './commissions.js';
 
 export const BOARD = Object.freeze({ left: 130, right: 1050, width: 920, lanes: [265, 400, 535] });
 const COLORS = { navy: '#172b4d', cream: '#fbf4dc', paper: '#fffbec', steel: '#c8d1cb', red: '#ef7259', teal: '#247f87' };
@@ -15,6 +16,10 @@ const ATMOSPHERES = Object.freeze({
 
 export function hitTest(x, y, state) {
   if (!['play', 'brief'].includes(state.stage)) return null;
+  for (const sheet of state.sheets || []) {
+    const centerX = Math.max(162, BOARD.left + BOARD.width * sheet.x);
+    if (Math.abs(x - centerX) < 45 && Math.abs(y - (BOARD.lanes[sheet.lane] + 20)) < 43) return { type: 'select-lane', lane: sheet.lane };
+  }
   for (let lane = 0; lane < 3; lane++) {
     const center = BOARD.lanes[lane];
     if (x > 36 && x < 122 && y > center - 54 && y < center + 63) return { type: 'route', lane };
@@ -98,9 +103,9 @@ export function createRenderer(canvas) {
     const cardCenter = left + 45;
     ctx.save();
     box(left + 2, top + 4, 90, 86, 'rgba(23,43,77,.17)', null, 3);
-    box(left, top, 90, 86, COLORS.paper, status.bad ? status.color : selected ? COLORS.teal : '#adb7a7', 3);
+    box(left, top, 90, 86, COLORS.paper, status.bad ? status.color : sheet.priority ? '#bd8b30' : selected ? COLORS.teal : '#adb7a7', 3);
     box(left + 4, top + 4, 82, 11, status.bad ? '#f0d6c9' : '#ecead9', null, 1);
-    label('NO.' + String(sheet.id).padStart(2, '0'), left + 8, top + 10, 8, '#52646b');
+    label(sheet.priority ? 'PRIORITY' : 'NO.' + String(sheet.id).padStart(2, '0'), left + 8, top + 10, sheet.priority ? 6.5 : 8, sheet.priority ? '#977123' : '#52646b');
     label(recipeSymbols(sheet.targetMask), left + 82, top + 10, 8.5, COLORS.navy, 'monospace', 'right');
     poster(edition, sheet.inkMask, sheet.stamped ? sheet.stamp : null, left + 5, top + 18, 45, 50);
     label('NEEDS', left + 56, top + 23, 6.5, '#7b8479');
@@ -134,7 +139,7 @@ export function createRenderer(canvas) {
       const x = 186 + index * 170;
       box(x, 128, 158, 59, COLORS.paper, index === 0 ? mood.accent : '#d7d5c3', 5);
       poster(state.shiftIndex, order.targetMask, state.level.stamps ? order.targetStamp : null, x + 5, 132, 44, 49);
-      label(index === 0 ? 'NEXT ORDER' : 'AFTER ' + index, x + 56, 139, 7.5, '#788278');
+      label(order.priority ? 'PRIORITY +40' : index === 0 ? 'NEXT ORDER' : 'AFTER ' + index, x + 56, 139, 7.5, order.priority ? '#ac7a2a' : '#788278');
       label(recipeName(order.targetMask).toUpperCase(), x + 56, 153, 11);
       label(recipeSymbols(order.targetMask), x + 56, 169, 11, mood.accent);
       if (state.level.stamps) glyph(order.targetStamp, x + 143, 170, 5, COLORS.navy, true);
@@ -189,16 +194,25 @@ export function createRenderer(canvas) {
       ctx.strokeStyle = '#c39f66'; ctx.beginPath(); ctx.moveTo(1076, y + 9); ctx.lineTo(1127, y + 9); ctx.moveTo(1100, y - 18); ctx.lineTo(1100, y + 43); ctx.stroke();
       label('SHIP', 1101, y - 35, 9, COLORS.navy, 'monospace', 'center');
     }
-    label(EDITIONS[state.shiftIndex].name.toUpperCase() + ' · EDITION ' + String(state.shiftIndex + 1).padStart(2, '0'), 43, 624, 12, mood.accent);
-    label('READ → SET ROLLERS → ROUTE' + (state.level.stamps ? ' → STAMP' : '') + ' → SHIP', 1155, 624, 11, COLORS.navy, 'monospace', 'right');
-    label('SHIP ' + state.stats.quota + ' MATCHED POSTERS · Wrong proofs cost paper · Space buys time', 43, 645, 10, '#64766c');
-    label('Outlined dots = required · Filled dots = printed', 1155, 645, 9, '#64766c', 'monospace', 'right');
+    box(27, 604, 1146, 47, '#f7efdb', '#c4c9b5', 7);
+    const client = state.commission;
+    if (client) {
+      label(client.name.toUpperCase(), 43, 617, 12, mood.accent);
+      label(commissionObjective(client), 43, 638, 11, COLORS.navy);
+      box(465, 611, 116, 31, client.completed ? '#d4e6d3' : '#e8dec1', null, 4);
+      label(client.completed ? 'MASTERED +' + client.bonus : client.progress + ' / ' + client.target + ' · +' + client.bonus, 523, 626, 11, client.completed ? '#2b7d64' : '#82632a', 'monospace', 'center');
+    } else {
+      label(EDITIONS[state.shiftIndex].name.toUpperCase() + ' · SHIP ' + state.stats.quota + ' MATCHED POSTERS', 43, 617, 12, mood.accent);
+      label('READ → SET ROLLERS → ROUTE → SHIP · Wrong proofs cost paper', 43, 638, 10, COLORS.navy);
+    }
+    label(runLabel(state), 1155, 617, 9, '#64766c', 'monospace', 'right');
+    label(state.transfer.enabled ? 'CLICK PAPER TO SELECT · Q/E CROSSFEED · INK STAYS ON PAPER' : 'Outlined dots = required · Filled dots = printed · Space buys time', 1155, 638, 9, COLORS.navy, 'monospace', 'right');
   }
   function acceptEvents(events) {
     for (const event of events) {
       if (['start', 'brief', 'title'].includes(event.type)) { effects.length = 0; prints.length = 0; clock = 0; }
       if (event.type === 'brief' && Number.isInteger(event.index)) currentEdition = event.index;
-      if (['ship', 'spoil', 'print', 'stamp-sheet', 'ink', 'stamp', 'recycle'].includes(event.type)) effects.push({ ...event, age: 0 });
+      if (['ship', 'spoil', 'print', 'stamp-sheet', 'ink', 'stamp', 'recycle', 'transfer'].includes(event.type)) effects.push({ ...event, age: 0 });
       if (event.type === 'ship') { prints.push({ mask: event.mask, stamp: event.stamp, edition: event.edition ?? currentEdition }); if (prints.length > 3) prints.shift(); }
     }
     if (effects.length > 40) effects.splice(0, effects.length - 40);
@@ -243,6 +257,12 @@ export function createRenderer(canvas) {
         const x = BOARD.left + BOARD.width * (effect.x ?? .9);
         const drop = preferences.reducedMotion ? 0 : effect.age * 24;
         label('RECYCLED', Math.max(185, Math.min(1010, x)), y - 5 + drop, 10, '#997954', 'monospace', 'center');
+      } else if (effect.type === 'transfer') {
+        const x = Math.max(160, Math.min(1030, BOARD.left + BOARD.width * effect.x));
+        const sourceY = BOARD.lanes[effect.from] + 20;
+        ctx.strokeStyle = '#247f87'; ctx.lineWidth = 3; ctx.setLineDash([5, 5]);
+        ctx.beginPath(); ctx.moveTo(x, sourceY); ctx.lineTo(x, y + 20); ctx.stroke(); ctx.setLineDash([]);
+        label('CROSSFEED', x, y - 37, 10, '#247f87', 'monospace', 'center');
       }
       ctx.globalAlpha = 1;
     }
