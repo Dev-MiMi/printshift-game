@@ -323,6 +323,12 @@ kbd { display: inline-block; font: 700 0.83cqw monospace; }
 .completed-build span { display: flex; flex-wrap: wrap; align-items: center; gap: .45cqw; }
 .completed-build b { font-size: .76cqw; color: #357b6c; }
 .completed-build i { font-style: normal; color: #9a885d; }
+.victory-panel { padding-top: .85cqw; padding-bottom: .85cqw; }
+.victory-panel h1 { font-size: 2.9cqw; }
+.victory-panel .result-metrics { margin-top: .65cqw; padding: .5cqw 0; }
+.victory-panel .collection-card { width: 9cqw; }
+.victory-panel .completed-build { padding: .4cqw .7cqw; margin: .4cqw 0; }
+.victory-panel .panel-actions { margin-top: .7cqw; }
 .build-ledger { margin-top: 1cqw; text-align: left; }
 .build-ledger .plan-heading { display: flex; justify-content: space-between; align-items: center; }
 .build-ledger .plan-heading b { font-size: 1.25cqw; }
