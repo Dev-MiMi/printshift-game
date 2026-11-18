@@ -19,6 +19,7 @@ export function createInput(canvas, onAction, getState, hitTest) {
     else if (Object.hasOwn(KEY_ACTIONS, key)) action = { type: 'toggle-ink', lane: state.selectedLane, ink: KEY_ACTIONS[key] };
     else if (key === 's') action = { type: 'cycle-stamp', lane: state.selectedLane };
     else if (key === 'r') action = { type: 'recycle' };
+    else if (key === 'f') action = { type: 'turn' };
     else if (key === 'q' || key === 'e') action = { type: 'transfer', direction: key === 'q' ? -1 : 1 };
     else if (key === ' ') action = { type: 'brake' };
     else if (key === 'arrowup' || key === 'arrowleft') action = { type: 'route', direction: -1 };

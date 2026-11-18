@@ -1,6 +1,7 @@
 import { INKS, INK_STATIONS, RECIPE_COLORS, STAMP_X, recipeName, recipeSymbols } from './recipes.js';
 import { EDITIONS, drawPoster } from './posters.js';
 import { commissionObjective, runLabel } from './commissions.js';
+import { exhibitionGoal, PAIR_WINDOW } from './exhibition.js';
 
 export const BOARD = Object.freeze({ left: 130, right: 1050, width: 920, lanes: [265, 400, 535] });
 const COLORS = { navy: '#172b4d', cream: '#fbf4dc', paper: '#fffbec', steel: '#c8d1cb', red: '#ef7259', teal: '#247f87' };
@@ -90,6 +91,7 @@ export function createRenderer(canvas) {
     ctx.drawImage(posterCache.get(key), x, y, width, height);
   }
   function paperStatus(sheet, needsStamp) {
+    if (sheet.awaitingFlip) return { text: 'F · TURN FRONT', color: '#a56e2b' };
     const wrong = (sheet.inkMask & ~sheet.targetMask) || (sheet.targetMask & sheet.processedMask & ~sheet.inkMask);
     if (wrong) return { text: 'REPRINT', color: '#b75543', bad: true };
     if (sheet.inkMask !== sheet.targetMask) return { text: 'LAYERING', color: '#7b877d' };
@@ -104,10 +106,15 @@ export function createRenderer(canvas) {
     ctx.save();
     box(left + 2, top + 4, 90, 86, 'rgba(23,43,77,.17)', null, 3);
     box(left, top, 90, 86, COLORS.paper, status.bad ? status.color : sheet.priority ? '#bd8b30' : selected ? COLORS.teal : '#adb7a7', 3);
-    box(left + 4, top + 4, 82, 11, status.bad ? '#f0d6c9' : '#ecead9', null, 1);
-    label(sheet.priority ? 'PRIORITY' : 'NO.' + String(sheet.id).padStart(2, '0'), left + 8, top + 10, sheet.priority ? 6.5 : 8, sheet.priority ? '#977123' : '#52646b');
+    box(left + 4, top + 4, 82, 11, status.bad ? '#f0d6c9' : sheet.side === 'back' ? '#d8e9dc' : '#ecead9', null, 1);
+    label(sheet.pairId ? 'PAIR ' + String(sheet.pairId).padStart(2, '0') : sheet.side ? sheet.side.toUpperCase() : sheet.priority ? 'PRIORITY' : 'NO.' + String(sheet.id).padStart(2, '0'), left + 8, top + 10, sheet.priority ? 6.5 : 8, sheet.priority ? '#977123' : '#52646b');
     label(recipeSymbols(sheet.targetMask), left + 82, top + 10, 8.5, COLORS.navy, 'monospace', 'right');
     poster(edition, sheet.inkMask, sheet.stamped ? sheet.stamp : null, left + 5, top + 18, 45, 50);
+    if (sheet.frontPrint) {
+      box(left + 6, top + 47, 22, 24, '#f7efd6', '#977f4a', 1);
+      poster(sheet.frontPrint.edition, sheet.frontPrint.mask, sheet.frontPrint.stamp, left + 7, top + 48, 19, 21);
+    }
+    if (sheet.side) label(sheet.side === 'front' ? 'A' : 'B', left + 43, top + 65, 8, COLORS.navy);
     label('NEEDS', left + 56, top + 23, 6.5, '#7b8479');
     INKS.forEach((ink, index) => {
       const yy = top + 33 + index * 11;
@@ -132,17 +139,27 @@ export function createRenderer(canvas) {
     ctx.fillRect(0, 103, 1200, 560);
     box(17, 109, 1166, 548, mood.frame, '#bcc8bb', 15);
     box(27, 120, 1146, 74, '#f5efdb', '#d3d2bd', 9);
-    label('THE ORDER BOOK', 45, 138, 10, '#596564');
+    label(state.exhibition?.paired ? 'PAIRED ORDERS' : 'THE ORDER BOOK', 45, 138, 10, '#596564');
     label('NEXT →', 45, 161, 17);
-    label('ROUTE BEFORE FEED', 45, 181, 8, '#68776b');
+    label(state.exhibition?.paired ? 'NEIGHBOR LANES' : 'ROUTE BEFORE FEED', 45, 181, 8, '#68776b');
     state.incoming?.forEach((order, index) => {
       const x = 186 + index * 170;
       box(x, 128, 158, 59, COLORS.paper, index === 0 ? mood.accent : '#d7d5c3', 5);
-      poster(state.shiftIndex, order.targetMask, state.level.stamps ? order.targetStamp : null, x + 5, 132, 44, 49);
-      label(order.priority ? 'PRIORITY +40' : index === 0 ? 'NEXT ORDER' : 'AFTER ' + index, x + 56, 139, 7.5, order.priority ? '#ac7a2a' : '#788278');
-      label(recipeName(order.targetMask).toUpperCase(), x + 56, 153, 11);
-      label(recipeSymbols(order.targetMask), x + 56, 169, 11, mood.accent);
-      if (state.level.stamps) glyph(order.targetStamp, x + 143, 170, 5, COLORS.navy, true);
+      if (state.exhibition?.paired || state.exhibition?.duplex) {
+        poster(state.shiftIndex, order.targetMask, order.targetStamp, x + 5, 135, 30, 33);
+        const partner = state.exhibition.paired;
+        poster(state.shiftIndex, partner ? order.partnerMask : order.backMask, partner ? order.partnerStamp : order.backStamp, x + 40, 135, 30, 33);
+        label(index === 0 ? 'NEXT ' + (partner ? 'PAIR' : 'FOLIO') : 'AFTER ' + index, x + 80, 140, 8, mood.accent);
+        label(recipeName(order.targetMask), x + 80, 153, 8.5);
+        label(recipeName(partner ? order.partnerMask : order.backMask), x + 80, 166, 8.5);
+        label(partner ? 'A ⇄ B · SHIP TOGETHER' : 'FRONT → F → BACK', x + 79, 179, 7, '#667568', 'monospace', 'center');
+      } else {
+        poster(state.shiftIndex, order.targetMask, state.level.stamps ? order.targetStamp : null, x + 5, 132, 44, 49);
+        label(order.priority ? 'PRIORITY +40' : index === 0 ? 'NEXT ORDER' : 'AFTER ' + index, x + 56, 139, 7.5, order.priority ? '#ac7a2a' : '#788278');
+        label(recipeName(order.targetMask).toUpperCase(), x + 56, 153, 11);
+        label(recipeSymbols(order.targetMask), x + 56, 169, 11, mood.accent);
+        if (state.level.stamps) glyph(order.targetStamp, x + 143, 170, 5, COLORS.navy, true);
+      }
     });
     const barWidth = 161, portion = Math.max(0, Math.min(1, (state.spawnClock || 0) / (state.level.spawnEvery || 4)));
     label('FEEDS INTO LANE ' + (state.routingLane + 1), 720, 142, 8, '#68716b');
@@ -192,11 +209,30 @@ export function createRenderer(canvas) {
       label(state.level.stamps ? 'STAMP' : 'LATER', stampX, y - 68, 7, '#68776b', 'monospace', 'center');
       box(1073, y - 23, 57, 68, '#e9bc70', '#b5965c', 5);
       ctx.strokeStyle = '#c39f66'; ctx.beginPath(); ctx.moveTo(1076, y + 9); ctx.lineTo(1127, y + 9); ctx.moveTo(1100, y - 18); ctx.lineTo(1100, y + 43); ctx.stroke();
-      label('SHIP', 1101, y - 35, 9, COLORS.navy, 'monospace', 'center');
+      label(state.exhibition?.duplex ? 'F · RETURN' : 'SHIP', 1101, y - 35, 9, COLORS.navy, 'monospace', 'center');
+      if (state.exhibition?.duplex) {
+        const waiting = state.sheets.filter(sheet => sheet.lane === lane && sheet.awaitingFlip);
+        if (waiting.length) {
+          box(1073, y - 23, 57, 68, '#eacb82', '#997133', 5);
+          label('F', 1101, y - 5, 24, '#795d2a', 'monospace', 'center');
+          label('TURN', 1101, y + 21, 8, '#795d2a', 'monospace', 'center');
+        }
+        ctx.strokeStyle = '#a89768'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 6]);
+        ctx.beginPath(); ctx.moveTo(1105, y + 56); ctx.lineTo(150, y + 56); ctx.lineTo(165, y + 48); ctx.stroke(); ctx.setLineDash([]);
+      }
     }
     box(27, 604, 1146, 47, '#f7efdb', '#c4c9b5', 7);
     const client = state.commission;
-    if (client) {
+    if (state.exhibition) {
+      const tour = state.exhibition;
+      label(tour.title.toUpperCase(), 43, 617, 14, mood.accent);
+      label(exhibitionGoal(tour).toUpperCase(), 43, 638, 11, COLORS.navy);
+      box(395, 611, 142, 31, '#e8d9ad', '#baa366', 4);
+      label(tour.completed + ' / ' + tour.goal + (tour.paired ? ' FRAMES' : ' FOLIOS'), 466, 626, 12, '#796230', 'monospace', 'center');
+      const waiting = Object.values(tour.waitingPairs).find(item => state.clock - item.time <= PAIR_WINDOW);
+      label(waiting ? 'PAIR WINDOW ' + Math.max(0, PAIR_WINDOW - state.clock + waiting.time).toFixed(1) + 's' : tour.duplex ? 'PRINT FRONT → F TURN → PRINT BACK' : 'TWO LANES → TWO CLEAN PRINTS', 558, 619, 9, waiting ? '#ae5c43' : '#596c68');
+      label(tour.duplex ? 'A = FRONT · B = BACK · INK ON FRONT STAYS' : 'PARTNERS ENTER NEIGHBORING LANES', 558, 638, 8, '#596c68');
+    } else if (client) {
       label(client.name.toUpperCase(), 43, 617, 12, mood.accent);
       label(commissionObjective(client), 43, 638, 11, COLORS.navy);
       box(465, 611, 116, 31, client.completed ? '#d4e6d3' : '#e8dec1', null, 4);
@@ -206,13 +242,13 @@ export function createRenderer(canvas) {
       label('READ → SET ROLLERS → ROUTE → SHIP · Wrong proofs cost paper', 43, 638, 10, COLORS.navy);
     }
     label(runLabel(state), 1155, 617, 9, '#64766c', 'monospace', 'right');
-    label(state.transfer.enabled ? 'CLICK PAPER TO SELECT · Q/E CROSSFEED · INK STAYS ON PAPER' : 'Outlined dots = required · Filled dots = printed · Space buys time', 1155, 638, 9, COLORS.navy, 'monospace', 'right');
+    label(state.exhibition ? 'PAIR / TURN / FRAME' : state.transfer.enabled ? 'CLICK PAPER TO SELECT · Q/E CROSSFEED · INK STAYS ON PAPER' : 'Outlined dots = required · Filled dots = printed · Space buys time', 1155, 638, 9, COLORS.navy, 'monospace', 'right');
   }
   function acceptEvents(events) {
     for (const event of events) {
       if (['start', 'brief', 'title'].includes(event.type)) { effects.length = 0; prints.length = 0; clock = 0; }
       if (event.type === 'brief' && Number.isInteger(event.index)) currentEdition = event.index;
-      if (['ship', 'spoil', 'print', 'stamp-sheet', 'ink', 'stamp', 'recycle', 'transfer'].includes(event.type)) effects.push({ ...event, age: 0 });
+      if (['ship', 'spoil', 'print', 'stamp-sheet', 'ink', 'stamp', 'recycle', 'transfer', 'turn'].includes(event.type)) effects.push({ ...event, age: 0 });
       if (event.type === 'ship') { prints.push({ mask: event.mask, stamp: event.stamp, edition: event.edition ?? currentEdition }); if (prints.length > 3) prints.shift(); }
     }
     if (effects.length > 40) effects.splice(0, effects.length - 40);
@@ -257,12 +293,12 @@ export function createRenderer(canvas) {
         const x = BOARD.left + BOARD.width * (effect.x ?? .9);
         const drop = preferences.reducedMotion ? 0 : effect.age * 24;
         label('RECYCLED', Math.max(185, Math.min(1010, x)), y - 5 + drop, 10, '#997954', 'monospace', 'center');
-      } else if (effect.type === 'transfer') {
+      } else if (effect.type === 'transfer' || effect.type === 'turn') {
         const x = Math.max(160, Math.min(1030, BOARD.left + BOARD.width * effect.x));
         const sourceY = BOARD.lanes[effect.from] + 20;
         ctx.strokeStyle = '#247f87'; ctx.lineWidth = 3; ctx.setLineDash([5, 5]);
         ctx.beginPath(); ctx.moveTo(x, sourceY); ctx.lineTo(x, y + 20); ctx.stroke(); ctx.setLineDash([]);
-        label('CROSSFEED', x, y - 37, 10, '#247f87', 'monospace', 'center');
+        label(effect.type === 'turn' ? 'BACK TO THE PRESS' : 'CROSSFEED', x, y - 37, 10, '#247f87', 'monospace', 'center');
       }
       ctx.globalAlpha = 1;
     }

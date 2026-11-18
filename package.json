@@ -1,9 +1,9 @@
 {
   "name": "printshift-game",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "private": true,
   "type": "module",
-  "description": "An original offline printing workshop with client commissions, crossfeed strategies and daily challenges.",
+  "description": "An original printing workshop with client commissions, two-sided folios, paired exhibitions and daily challenges.",
   "scripts": { "start": "node serve.mjs", "check": "node tools/check.mjs" },
   "license": "MIT"
 }

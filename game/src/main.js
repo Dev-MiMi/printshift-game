@@ -24,6 +24,10 @@ function consume(events) {
     if (event.type === 'combo') ui.toast(event.combo + ' prints in a row! The press is singing.', 'good');
     if (event.type === 'commission-complete') ui.toast(event.name + ' commission mastered! +' + event.bonus, 'good');
     if (event.type === 'transfer-blocked') ui.toast(event.reason, 'bad');
+    if (event.type === 'turn-blocked' || event.type === 'pair-missed') ui.toast(event.reason, 'bad');
+    if (event.type === 'pair-complete') ui.toast('Pair framed! ' + event.completed + '/' + event.goal + ' · +' + event.bonus, 'good');
+    if (event.type === 'folio-complete') ui.toast('Both faces printed · +' + event.bonus, 'good');
+    if (event.type === 'return-ready') ui.toast('Front ready · Select lane ' + (event.lane + 1) + ' and press F to turn.', 'good');
     if (event.type === 'proof-recovered') ui.toast('A proof point recovered. Keep your streak.', 'good');
     if (event.type === 'spoil') {
       const inkWrong = event.actualMask !== event.targetMask;

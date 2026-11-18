@@ -1,6 +1,6 @@
 /** Local keepsakes only: no account, network or competitive score service. */
 const STORAGE_KEY = 'printshift-workshop-v3';
-const emptyProgress = () => ({ version: 1, collections: 0, bestCampaign: 0, dailyBests: {}, editions: [], masteredClients: [] });
+const emptyProgress = () => ({ version: 1, collections: 0, bestCampaign: 0, bestExhibition: 0, exhibitions: 0, dailyBests: {}, editions: [], masteredClients: [] });
 
 export function loadProgress(storage) {
   try {
@@ -10,6 +10,8 @@ export function loadProgress(storage) {
     const progress = emptyProgress();
     progress.collections = Math.max(0, Math.floor(Number(saved.collections) || 0));
     progress.bestCampaign = Math.max(0, Math.floor(Number(saved.bestCampaign) || 0));
+    progress.bestExhibition = Math.max(0, Math.floor(Number(saved.bestExhibition) || 0));
+    progress.exhibitions = Math.max(0, Math.floor(Number(saved.exhibitions) || 0));
     progress.editions = (Array.isArray(saved.editions) ? saved.editions : []).filter(item => Number.isInteger(item.edition) && item.edition >= 0 && item.edition < 5 && Number.isInteger(item.mask) && item.mask > 0 && item.mask < 8 && ['circle', 'diamond', 'star'].includes(item.stamp)).slice(-35);
     progress.masteredClients = (Array.isArray(saved.masteredClients) ? saved.masteredClients : []).filter(id => ['books', 'parade', 'courier', 'archive'].includes(id));
     for (const [day, score] of Object.entries(saved.dailyBests || {}).slice(-14)) {
@@ -35,6 +37,9 @@ export function rememberCollection(progress, state, storage) {
     } else if (state.mode === 'daily') {
       next.dailyBests[state.seed] = Math.max(next.dailyBests[state.seed] || 0, state.stats.campaignScore);
       next.dailyBests = Object.fromEntries(Object.entries(next.dailyBests).sort().slice(-14));
+    } else if (state.mode === 'exhibition') {
+      next.exhibitions = (next.exhibitions || 0) + 1;
+      next.bestExhibition = Math.max(next.bestExhibition || 0, state.stats.campaignScore);
     }
   }
   try { (storage ?? globalThis.localStorage)?.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* The game remains playable when storage is unavailable. */ }

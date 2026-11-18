@@ -16,6 +16,8 @@ Six upgrades support different strategies. Build around safer proofs, longer bra
 
 The daily challenge starts at the three advanced shifts, using the UTC date as its shared seed and a fixed client route. Replay it with another upgrade strategy to improve your personal best. The local print archive saves actual completed color editions and mastered clients. No login or network connection is needed; saved progress is optional, and the game still plays if browser storage is unavailable.
 
+The optional **Exhibition Tour** adds three production puzzles for experienced printers. The paired gallery feeds two orders to neighboring lanes: ship both within three seconds to frame a matched pair. The two-sided folio returns a correctly printed front to the press; turn it with F, preserve its front artwork, and set a fresh ink recipe and stamp for its back. The grand showcase combines both systems: frame three pairs of finished two-sided folios before closing. Choose one of three starting workshop kits, then install another upgrade between venues. The tour saves its own personal best and shows the real completed prints in its finale.
+
 ## Play
 
 ```sh
@@ -30,6 +32,7 @@ Open the printed localhost address in a current desktop browser. The default por
 - **Q / E:** crossfeed the leading unfinished paper up or down a lane (unlocked after shift 1). Click a moving sheet to select its lane; the destination must have room, and ink already printed stays on the sheet.
 - **Space:** use the precision brake.
 - **R:** recycle a sheet on the selected lane.
+- **F:** in the Exhibition Tour, turn a correct front waiting at the return rack onto the neighboring lane to print its back.
 - **P / Escape:** pause or resume.
 - Mouse clicks work on the lane selectors, ink switches, stamps, and menu buttons.
 

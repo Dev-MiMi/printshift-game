@@ -1,6 +1,7 @@
 import { SHIFTS, UPGRADES, upgradeOffers, shiftGrade } from './levels.js';
 import { INKS, INK_STATIONS, SHIP_X, STAMP_X, STAMPS, nextRandom, recipeMatches } from './recipes.js';
 import { commissionOffers, makeCommission, commissionOrder, recordCommissionPrint } from './commissions.js';
+import { EXHIBITIONS, PRESS_KITS, createExhibition, exhibitionOrder, feedExhibition, waitForTurn, turnFolio, recordExhibitionPrint } from './exhibition.js';
 
 const STEP = 1 / 60;
 const PREVIEW_COUNT = 3;
@@ -21,11 +22,11 @@ export function createGame({ mode = 'campaign', seed = 20261116 } = {}) {
     upgrades: freshUpgrades(),
     upgradeAvailable: false, upgradeChosen: null, upgradeOffers: [], nextSheetId: 1,
     commission: null, commissionChoices: [], pendingCommission: null, orderSequence: 0,
-    transfer: {}, lastPrintMask: null, progress: null,
+    transfer: {}, lastPrintMask: null, progress: null, exhibition: null, exhibitionKit: null,
     clock: 0, accumulator: 0, spawnClock: 0, completed: false,
     notice: '', failureReason: '', events: [], maxUnlocked: 0,
   };
-  prepareShift(state, mode === 'daily' ? 2 : 0);
+  prepareShift(state, ['daily', 'exhibition'].includes(mode) ? 2 : 0);
   state.stage = 'title';
   return state;
 }
@@ -39,7 +40,7 @@ function makeOrder(state) {
     targetMask = choices[(choices.indexOf(targetMask) + 1) % choices.length];
   }
   const targetStamp = state.level.stamps ? STAMPS[Math.floor(nextRandom(state) * STAMPS.length)] : 'circle';
-  return commissionOrder(state, { targetMask, targetStamp });
+  return exhibitionOrder(state, commissionOrder(state, { targetMask, targetStamp }));
 }
 
 function refillPreview(state) {
@@ -54,8 +55,10 @@ function prepareShift(state, index, commissionId = null) {
     hint: 'Click an ink roller to switch it. Click a lane to choose where the next blank sheet enters.',
     duration: 90, quota: 5, speed: 0.082, spawnEvery: 6, qualityMax: 8,
   } : { ...SHIFTS[state.shiftIndex] };
+  state.exhibition = state.mode === 'exhibition' ? createExhibition(state.shiftIndex - 2) : null;
+  if (state.exhibition) state.level = { ...state.level, ...EXHIBITIONS[state.exhibition.index] };
   state.commission = null;
-  if (state.mode !== 'practice' && state.shiftIndex > 0) {
+  if (!state.exhibition && state.mode !== 'practice' && state.shiftIndex > 0) {
     const id = commissionId || commissionOffers(state.seed, state.shiftIndex, state.level)[0].id;
     state.commission = makeCommission(id, state.seed, state.shiftIndex, state.level);
     const client = state.commission;
@@ -78,7 +81,7 @@ function prepareShift(state, index, commissionId = null) {
     shipped: 0, spoiled: 0, recycled: 0, combo: 0, bestCombo: 0,
     quality: qualityMax, qualityMax, timeRemaining: state.level.duration,
     quota: state.level.quota, earned: 0, elapsed: 0,
-    specimen: null, commissionBonus: 0, batchBonus: 0, transfers: 0,
+    specimen: null, commissionBonus: 0, batchBonus: 0, transfers: 0, frontSpecimen: null,
     timeExtension: 0, priorityShipped: 0,
   };
   state.brake = { remaining: 0, cooldown: 0, ready: true, duration: 2.2 + state.upgrades.brake * 0.4 };
@@ -127,6 +130,7 @@ function finishShift(state, events) {
     commission: state.commission ? { id: state.commission.id, name: state.commission.name, completed: state.commission.completed, progress: state.commission.progress, target: state.commission.target } : null,
     commissionBonus: state.stats.commissionBonus, batchBonus: state.stats.batchBonus,
     transfers: state.stats.transfers,
+    exhibition: state.exhibition ? { id: state.exhibition.id, title: state.exhibition.title, completed: state.exhibition.completed, goal: state.exhibition.goal, turns: state.exhibition.turns, bonus: state.exhibition.bonus, framed: state.exhibition.framed, frontSpecimen: state.stats.frontSpecimen } : null,
   };
   state.history = [...state.history.filter(item => item.index < state.shiftIndex), result];
   state.stats.campaignScore = state.history.reduce((sum, shift) => sum + shift.score, 0);
@@ -134,7 +138,7 @@ function finishShift(state, events) {
   state.upgradeAvailable = state.mode !== 'practice' && state.shiftIndex < SHIFTS.length - 1;
   if (state.upgradeAvailable) {
     state.upgradeOffers = upgradeOffers(state.seed, state.shiftIndex, state.upgrades);
-    state.commissionChoices = commissionOffers(state.seed, state.shiftIndex + 1, SHIFTS[state.shiftIndex + 1]);
+    state.commissionChoices = state.exhibition ? [] : commissionOffers(state.seed, state.shiftIndex + 1, SHIFTS[state.shiftIndex + 1]);
     // Daily runs have the same client route for everyone that day.
     state.pendingCommission = state.mode === 'daily' ? state.commissionChoices[0].id : null;
   }
@@ -173,8 +177,12 @@ function shipSheet(state, sheet, events) {
       state.stats.score += state.commission.bonus;
       events.push(event('commission-complete', { name: state.commission.name, bonus: state.commission.bonus }));
     }
+    if (state.exhibition) {
+      if (sheet.frontPrint) state.stats.frontSpecimen = sheet.frontPrint;
+      events.push(...recordExhibitionPrint(state, sheet));
+    }
     if (state.stats.combo > 1 && state.stats.combo % 5 === 0) events.push(event('combo', { combo: state.stats.combo }));
-    if (state.stats.shipped >= state.stats.quota) finishShift(state, events);
+    if (state.stats.shipped >= state.stats.quota && (!state.exhibition || state.exhibition.completed >= state.exhibition.goal)) finishShift(state, events);
   } else {
     state.stats.spoiled++;
     state.stats.combo = 0;
@@ -200,15 +208,18 @@ function stepWorkshop(state, dt, events) {
   state.spawnClock -= dt * beltFactor;
   if (state.spawnClock <= 0 && state.sheets.length < MAX_SHEETS) {
     const target = state.incoming.shift();
-    state.sheets.push({ id: state.nextSheetId++, lane: state.routingLane, x: 0.025, ...target, inkMask: 0, stamp: null, processedMask: 0, stamped: false });
+    const batch = state.exhibition ? feedExhibition(state, target, state.nextSheetId) : [{ id: state.nextSheetId, lane: state.routingLane, ...target }];
+    state.nextSheetId += batch.length;
+    for (const sheet of batch) state.sheets.push({ ...sheet, x: .025, inkMask: 0, stamp: null, processedMask: 0, stamped: false });
     refillPreview(state);
     state.spawnClock += state.level.spawnEvery;
-    events.push(event('feed', { lane: state.routingLane, targetMask: target.targetMask, targetStamp: target.targetStamp }));
+    events.push(event('feed', { lane: state.routingLane, targetMask: target.targetMask, targetStamp: target.targetStamp, paired: Boolean(state.exhibition?.paired) }));
   }
   for (const lane of state.lanes) lane.pulse = Math.max(0, lane.pulse - dt);
   const survivors = [];
   for (let sheetIndex = 0; sheetIndex < state.sheets.length; sheetIndex++) {
     const sheet = state.sheets[sheetIndex];
+    if (sheet.awaitingFlip) { survivors.push(sheet); continue; }
     const before = sheet.x;
     sheet.x += state.level.speed * dt * beltFactor;
     const lane = state.lanes[sheet.lane];
@@ -228,6 +239,7 @@ function stepWorkshop(state, dt, events) {
       sheet.stamp = lane.stamp;
       if (state.level.stamps) events.push(event('stamp-sheet', { lane: sheet.lane, stamp: sheet.stamp, id: sheet.id }));
     }
+    if (state.exhibition?.duplex && waitForTurn(sheet)) events.push(event('return-ready', { lane: sheet.lane, id: sheet.id }));
     if (sheet.x >= SHIP_X) {
       shipSheet(state, sheet, events);
       if (state.stage !== 'play') {
@@ -266,13 +278,22 @@ export function applyAction(state, action) {
   const events = [];
   if (!action || typeof action.type !== 'string') return events;
   if (action.type === 'start' || action.type === 'restart') {
-    if (['campaign', 'practice', 'daily'].includes(action.mode)) state.mode = action.mode;
+    if (['campaign', 'practice', 'daily', 'exhibition'].includes(action.mode)) state.mode = action.mode;
     if (Number.isSafeInteger(action.seed) && action.seed > 0) state.seed = action.seed >>> 0 || 1;
     state.history = [];
     state.upgrades = freshUpgrades();
     state.nextSheetId = 1;
-    beginShift(state, state.mode === 'daily' ? 2 : 0);
+    state.exhibitionKit = null;
+    beginShift(state, ['daily', 'exhibition'].includes(state.mode) ? 2 : 0);
+    if (state.mode === 'exhibition') { state.stage = 'setup'; events.push(event('setup')); }
     events.push(event('start'));
+  } else if (action.type === 'kit' && state.stage === 'setup' && state.mode === 'exhibition') {
+    const kit = PRESS_KITS.find(item => item.id === action.choice);
+    if (!kit) return events;
+    state.exhibitionKit = kit.id;
+    state.upgrades = { ...freshUpgrades(), ...kit.upgrades };
+    events.push(...beginShift(state, 2));
+    events.push(event('upgrade', { choice: kit.id }));
   } else if (action.type === 'title') {
     state.stage = 'title';
     state.previousStage = null;
@@ -284,7 +305,7 @@ export function applyAction(state, action) {
     state.stage = 'play';
     events.push(event('shift-start', { index: state.shiftIndex }));
   } else if (action.type === 'next' && state.stage === 'shift-complete') {
-    if (!state.pendingCommission || state.upgradeAvailable) return events;
+    if ((!state.exhibition && !state.pendingCommission) || state.upgradeAvailable) return events;
     events.push(...beginShift(state, state.shiftIndex + 1, state.pendingCommission));
   } else if (action.type === 'retry' && ['failure', 'paused', 'play', 'shift-complete'].includes(state.stage)) {
     // A completed shift's score and reward belong to that attempt. Replay it
@@ -354,6 +375,8 @@ export function applyAction(state, action) {
         state.recycle.ready = false;
         events.push(event('recycle', { id: sheet.id, lane: sheet.lane, x: sheet.x, mask: sheet.inkMask }));
       }
+    } else if (action.type === 'turn' && state.exhibition?.duplex) {
+      events.push(turnFolio(state));
     } else if (action.type === 'transfer' && state.transfer.enabled && state.transfer.ready) {
       const source = state.selectedLane;
       const direction = action.direction === -1 ? -1 : 1;

@@ -259,6 +259,113 @@ kbd { display: inline-block; font: 700 0.83cqw monospace; }
 .brief-panel .brief-target { padding: .8cqw 0; margin-top: .6cqw; }
 .brief-panel .panel-actions { margin-top: 1.2cqw; }
 .brief-panel .preference-row { margin-top: .8cqw; }
+.title-panel .mode-actions { gap: .65cqw; }
+.title-panel .mode-actions .button { padding-left: 1cqw; padding-right: 1cqw; font-size: 1cqw; }
+.title-panel .exhibition-start { background: #397d71; border-color: #276358; }
+.turn-key.is-ready { background: #efca78; border-color: #ba903c; }
+.utility-controls .turn-key { padding-left: .55cqw; padding-right: .55cqw; }
+.exhibition-route { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1cqw; margin: 1.15cqw 0; }
+.exhibition-route > span { text-align: left; padding: .85cqw 1cqw; border: 1px solid #c4b898; background: #ece3cb; }
+.exhibition-route > span.is-current { background: #d9e9d7; border-color: #739d86; }
+.exhibition-route > span.is-delivered { background: #e3e7d0; }
+.exhibition-route i { display: inline-block; font: normal 700 1.25cqw monospace; color: #548675; margin-bottom: .35cqw; }
+.exhibition-route b { display: block; font: 700 1.25cqw Georgia, serif; }
+.exhibition-route small { display: block; margin-top: .35cqw; font: 700 .68cqw monospace; color: #8b794f; }
+.exhibition-setup { width: 78cqw; padding: 2cqw 2.8cqw; text-align: center; }
+.exhibition-setup .panel-intro, .exhibition-brief .panel-intro { max-width: none; }
+.press-kit-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1cqw; margin-top: 1cqw; }
+.press-kit { display: flex; flex-direction: column; text-align: left; padding: 1cqw; background: #f3e5c5; border: 1px solid #b7a98b; color: var(--ink); }
+.press-kit:nth-child(2) { background: #dcebe0; }
+.press-kit:nth-child(3) { background: #f1dcca; }
+.press-kit:hover { border-color: #4d7e73; transform: translateY(-2px); }
+.press-kit > i { font: normal 2.5cqw Georgia, serif; color: #9a733d; }
+.press-kit > b { font: 700 1.6cqw Georgia, serif; margin: .3cqw 0 .65cqw; }
+.press-kit > span { font-size: 1cqw; line-height: 1.5; color: #637275; flex: 1; }
+.press-kit > strong { font-size: .95cqw; margin-top: 1cqw; padding-top: .6cqw; border-top: 1px solid #bdb697; }
+.exhibition-brief { width: 76cqw; padding: 1.7cqw 2.7cqw; }
+.exhibition-target, .exhibition-summary { display: flex; justify-content: space-between; align-items: center; padding: .8cqw 1cqw; background: #ead8a9; color: #82632c; font: 700 1.15cqw Georgia, serif; }
+.exhibition-target span, .exhibition-summary span { font: .85cqw monospace; }
+.exhibition-lesson { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4cqw; margin-top: 1cqw; }
+.exhibition-lesson i { display: inline-block; font: normal 700 1.7cqw monospace; color: #367d73; }
+.exhibition-lesson b { display: block; margin-top: .3cqw; font-size: 1.15cqw; }
+.exhibition-lesson p { margin: .35cqw 0; font-size: .95cqw; color: #657574; line-height: 1.4; }
+.exhibition-brief .panel-actions { margin-top: 1.1cqw; }
+.exhibition-result { padding: 1.4cqw 2.7cqw; }
+.exhibition-result h1 { font-size: 3.2cqw; }
+.exhibition-result .exhibition-route { margin: .7cqw 0; }
+.exhibition-result .upgrade-heading { margin-top: .8cqw; }
+.exhibition-next { margin-top: 1cqw; padding: 1cqw; background: #dde8d4; }
+.exhibition-next b { display: block; font: 700 1.8cqw Georgia, serif; }
+.exhibition-next span { display: block; margin-top: .6cqw; font-size: 1cqw; }
+.exhibition-collection { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4cqw; margin: 1.15cqw 0; }
+.exhibition-keepsake { padding: 1cqw; background: #eee1c5; border: 1px solid #c4b493; }
+.framed-prints { display: flex; justify-content: center; gap: .65cqw; padding: .65cqw; background: #263c5c; box-shadow: .2cqw .2cqw #bbac8a; }
+.framed-prints > div { width: 7.3cqw; padding: .25cqw; background: #f8efd4; }
+.framed-prints svg { display: block; width: 100%; height: auto; }
+.exhibition-keepsake > b { display: block; margin-top: .8cqw; font: 700 1.3cqw Georgia, serif; }
+.exhibition-keepsake > small { display: block; margin-top: .4cqw; font: .73cqw monospace; color: #458574; }
+.exhibition-victory .installed-upgrades { margin: .6cqw 0; }
+.exhibition-setup { padding-top: 1.2cqw; padding-bottom: 1.2cqw; }
+.exhibition-setup h1 { font-size: 3.2cqw; margin-bottom: .4cqw; }
+.exhibition-setup .panel-intro { font-size: 1.05cqw; line-height: 1.4; }
+.exhibition-setup .exhibition-route { margin: .65cqw 0; }
+.exhibition-setup .exhibition-route > span { padding: .5cqw .8cqw; }
+.exhibition-setup .exhibition-route i { font-size: 1cqw; margin-bottom: .2cqw; }
+.exhibition-setup .exhibition-route b { font-size: 1.1cqw; }
+.exhibition-setup .exhibition-route small { margin-top: .2cqw; font-size: .62cqw; }
+.exhibition-setup .upgrade-heading b { font-size: 1.4cqw; }
+.exhibition-setup .upgrade-heading span { font-size: .85cqw; margin-top: .25cqw; }
+.exhibition-setup .press-kit-grid { margin-top: .65cqw; }
+.exhibition-setup .press-kit { padding: .65cqw .85cqw; }
+.exhibition-setup .press-kit > i { font-size: 1.6cqw; }
+.exhibition-setup .press-kit > b { font-size: 1.3cqw; margin: .2cqw 0 .4cqw; }
+.exhibition-setup .press-kit > span { font-size: .9cqw; line-height: 1.4; }
+.exhibition-setup .press-kit > strong { font-size: .85cqw; margin-top: .5cqw; padding-top: .4cqw; }
+.exhibition-setup .tip-line { margin-top: .65cqw; padding: .55cqw .8cqw; font-size: .85cqw; }
+.exhibition-setup .panel-actions { margin-top: .65cqw; }
+.exhibition-setup .button { padding: .8cqw 1.4cqw; font-size: 1.05cqw; }
+.exhibition-brief { padding: 1.15cqw 2.7cqw; }
+.exhibition-brief h1 { font-size: 3.1cqw; margin-bottom: .4cqw; }
+.exhibition-brief .panel-intro { font-size: 1.05cqw; line-height: 1.4; }
+.exhibition-brief .exhibition-route { margin: .65cqw 0; }
+.exhibition-brief .exhibition-route > span { padding: .45cqw .8cqw; }
+.exhibition-brief .exhibition-route i { font-size: .95cqw; margin-bottom: .15cqw; }
+.exhibition-brief .exhibition-route b { font-size: 1.1cqw; }
+.exhibition-brief .exhibition-route small { font-size: .62cqw; margin-top: .2cqw; }
+.exhibition-brief .exhibition-target { padding: .6cqw .9cqw; }
+.exhibition-brief .exhibition-lesson { gap: 1.2cqw; margin-top: .65cqw; }
+.exhibition-brief .exhibition-lesson i { font-size: 1.3cqw; }
+.exhibition-brief .exhibition-lesson b { font-size: 1.05cqw; margin-top: .2cqw; }
+.exhibition-brief .exhibition-lesson p { font-size: .88cqw; margin: .25cqw 0; }
+.exhibition-brief .installed-upgrades { margin: .4cqw 0; }
+.exhibition-brief .tip-line { font-size: .85cqw; padding: .55cqw .8cqw; margin-top: .6cqw; line-height: 1.4; }
+.exhibition-brief .panel-actions { margin-top: .75cqw; }
+.exhibition-brief .button { font-size: 1.05cqw; padding: .85cqw 1.5cqw; }
+.exhibition-result { padding-top: 1cqw; padding-bottom: 1cqw; }
+.exhibition-result h1 { font-size: 2.8cqw; margin-bottom: .4cqw; }
+.exhibition-result .exhibition-route { margin: .45cqw 0; }
+.exhibition-result .exhibition-route > span { padding: .35cqw .8cqw; }
+.exhibition-result .exhibition-route i { font-size: .9cqw; margin-bottom: .1cqw; }
+.exhibition-result .exhibition-route b { font-size: 1.05cqw; }
+.exhibition-result .exhibition-route small { font-size: .6cqw; margin-top: .15cqw; }
+.exhibition-result .exhibition-summary { padding: .5cqw .8cqw; font-size: 1.05cqw; }
+.exhibition-result .exhibition-summary span { font-size: .75cqw; }
+.exhibition-result .upgrade-heading { margin-top: .5cqw; }
+.exhibition-result .upgrade-heading b { font-size: 1.4cqw; }
+.exhibition-result .upgrade-heading span { font-size: .8cqw; }
+.exhibition-result .upgrade-grid { margin-top: .6cqw; }
+.exhibition-result .upgrade-card { padding-top: .6cqw; }
+.exhibition-result .upgrade-benefit { font-size: 1.1cqw; margin: .35cqw 0; }
+.exhibition-result .upgrade-detail { font-size: .85cqw; min-height: 2.6cqw; }
+.exhibition-result .panel-actions { margin-top: .65cqw; }
+.exhibition-result .button { font-size: 1.05cqw; padding: .85cqw 1.3cqw; }
+.exhibition-victory { padding-top: 1cqw; padding-bottom: 1cqw; }
+.exhibition-victory .exhibition-collection { margin: .7cqw 0; }
+.exhibition-victory .exhibition-keepsake { padding: .65cqw .8cqw; }
+.exhibition-victory .framed-prints { padding: .5cqw; }
+.exhibition-victory .framed-prints > div { width: 6.5cqw; }
+.exhibition-victory .exhibition-keepsake > b { margin-top: .5cqw; font-size: 1.15cqw; }
+.exhibition-victory .exhibition-keepsake > small { margin-top: .25cqw; font-size: .68cqw; }
 @media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; animation: none !important; } }
 @media (max-width: 700px) {
   .panel-intro { font-size: 1.35cqw; }

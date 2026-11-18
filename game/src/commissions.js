@@ -81,5 +81,5 @@ export function dailySeed(date = new Date()) {
 }
 
 export function runLabel(state) {
-  return state.mode === 'daily' ? `DAILY ${state.seed}` : `COLLECTION ${state.seed.toString(36).toUpperCase()}`;
+  return state.mode === 'exhibition' ? `EXHIBITION ${state.seed.toString(36).toUpperCase()}` : state.mode === 'daily' ? `DAILY ${state.seed}` : `COLLECTION ${state.seed.toString(36).toUpperCase()}`;
 }
