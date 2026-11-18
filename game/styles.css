@@ -255,6 +255,10 @@ kbd { display: inline-block; font: 700 0.83cqw monospace; }
 .result-panel .result-metrics strong { font-size: 2.7cqw; }
 .result-panel .upgrade-grid { margin-top: .7cqw; }
 .result-panel .upgrade-detail { min-height: 2.8cqw; }
+.brief-panel { padding-top: 1.8cqw; padding-bottom: 1.4cqw; }
+.brief-panel .brief-target { padding: .8cqw 0; margin-top: .6cqw; }
+.brief-panel .panel-actions { margin-top: 1.2cqw; }
+.brief-panel .preference-row { margin-top: .8cqw; }
 @media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; animation: none !important; } }
 @media (max-width: 700px) {
   .panel-intro { font-size: 1.35cqw; }
