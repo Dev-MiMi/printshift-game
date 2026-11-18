@@ -14,6 +14,8 @@ Four clients change your order book. Corner Books orders inks in pairs and rewar
 
 Six upgrades support different strategies. Build around safer proofs, longer brakes, clean combos, faster crossfeed, recycled proof recovery, or repeat-ink batch bonuses. Paper recovery preserves a streak when recycling; batch memory rewards paired commissions. Crossfeed changes a sheet's lane while preserving every ink layer, and an occupied destination blocks the move. Upgrade and client offers change with each collection; retrying a shift keeps its order sequence and earlier work.
 
+Between shifts, the workshop planning desk puts the next client and your upgrade beside one another. Preview the client's actual first three orders, compare its print quota, feed pattern, time and proof allowance, then choose the press upgrade that suits your plan. Pick a client first to highlight matching tools, or install a tool first and choose its next job. The collection route shows the clients you already delivered for and the next edition. The finale records your real route and installed press; the local archive keeps six completed builds so you can compare their scores and try another combination next collection.
+
 The daily challenge starts at the three advanced shifts, using the UTC date as its shared seed and a fixed client route. Replay it with another upgrade strategy to improve your personal best. The local print archive saves actual completed color editions and mastered clients. No login or network connection is needed; saved progress is optional, and the game still plays if browser storage is unavailable.
 
 ## Play

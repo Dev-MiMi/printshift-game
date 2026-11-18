@@ -1,6 +1,7 @@
 import { INKS, INK_STATIONS, RECIPE_COLORS, STAMP_X, recipeName, recipeSymbols } from './recipes.js';
 import { EDITIONS, drawPoster } from './posters.js';
 import { commissionObjective, runLabel } from './commissions.js';
+import { UPGRADES } from './levels.js';
 
 export const BOARD = Object.freeze({ left: 130, right: 1050, width: 920, lanes: [265, 400, 535] });
 const COLORS = { navy: '#172b4d', cream: '#fbf4dc', paper: '#fffbec', steel: '#c8d1cb', red: '#ef7259', teal: '#247f87' };
@@ -206,7 +207,8 @@ export function createRenderer(canvas) {
       label('READ → SET ROLLERS → ROUTE → SHIP · Wrong proofs cost paper', 43, 638, 10, COLORS.navy);
     }
     label(runLabel(state), 1155, 617, 9, '#64766c', 'monospace', 'right');
-    label(state.transfer.enabled ? 'CLICK PAPER TO SELECT · Q/E CROSSFEED · INK STAYS ON PAPER' : 'Outlined dots = required · Filled dots = printed · Space buys time', 1155, 638, 9, COLORS.navy, 'monospace', 'right');
+    const build = UPGRADES.filter(item => state.upgrades[item.id] > 0).map(item => item.short + (state.upgrades[item.id] > 1 ? ' II' : ''));
+    label(build.length ? 'YOUR PRESS · ' + build.join(' · ') : 'Outlined dots = required · Filled dots = printed · Space buys time', 1155, 638, build.length ? 8 : 9, COLORS.navy, 'monospace', 'right');
   }
   function acceptEvents(events) {
     for (const event of events) {
